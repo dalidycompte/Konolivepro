@@ -58,6 +58,7 @@ const SECURITY_HEADERS: Record<string, string> = {
 };
 
 export default defineConfig({
+  base: "./",
   plugins: [
     react({
       // Babel transforms uniquement sur les fichiers JSX/TSX — évite le traitement inutile des .ts purs
