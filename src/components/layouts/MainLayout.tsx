@@ -142,7 +142,7 @@ const SidebarContent = memo(function SidebarContent({ onNavigate }: { onNavigate
                 });
               }
 
-              if (!window.location.pathname.startsWith('/agent/process/')) {
+              if (!location.pathname.startsWith('/agent/process/')) {
                 navigate(`/agent/process/${payload.new.id}`);
               }
             }

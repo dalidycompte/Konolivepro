@@ -310,6 +310,7 @@ export default function ProcessRequestPage() {
     setClaiming(false);
     if (!error) {
       toast.success("Nouvelle demande prise en charge.");
+      navigate(`/agent/process/${reqId}`);
     } else {
       toast.error("Cette demande n'est plus disponible.");
       loadAgentReqs();

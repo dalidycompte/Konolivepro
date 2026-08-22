@@ -517,6 +517,10 @@ export default function AgentDashboard() {
                                     toast.error("Impossible de s'attribuer cette demande.");
                                   } else {
                                     toast.success(`Demande +${r.phone_to_certify} ajoutée.`);
+                                    setClaiming(false);
+                                    await load();
+                                    navigate(`/agent/process/${r.id}`);
+                                    return;
                                   }
                                   setClaiming(false);
                                   load();
