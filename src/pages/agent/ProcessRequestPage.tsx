@@ -767,9 +767,18 @@ export default function ProcessRequestPage() {
     try {
       const urls: string[] = [...(processingDetails.screenshot_urls || [])];
       for (const file of Array.from(files)) {
-        const ext = file.name.split('.').pop();
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+          throw new Error(`Format non accepté pour « ${file.name} ». Utilisez JPG, PNG ou WebP.`);
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(`« ${file.name} » dépasse la limite de 10 Mo.`);
+        }
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
         const path = `${profile.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-        const { error } = await supabase.storage.from('processing-screenshots').upload(path, file);
+        const { error } = await supabase.storage.from('processing-screenshots').upload(path, file, {
+          contentType: file.type,
+          upsert: false,
+        });
         if (error) throw error;
         const { data: { publicUrl } } = supabase.storage.from('processing-screenshots').getPublicUrl(path);
         urls.push(publicUrl);
@@ -777,8 +786,9 @@ export default function ProcessRequestPage() {
       setProcessingDetails(prev => ({ ...prev, screenshot_urls: urls }));
       toast.success(`${Array.from(files).length} capture(s) ajoutée(s)`);
     } catch (e) {
-      console.error(e);
-      toast.error("Erreur lors de l'upload de la capture.");
+      console.error('Screenshot upload error:', e);
+      const message = e instanceof Error ? e.message : "Erreur inconnue lors de l'upload.";
+      toast.error(message);
     } finally {
       setScreenshotUploading(false);
     }
