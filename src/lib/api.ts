@@ -201,7 +201,7 @@ export async function updateRequestStatus(
     (updates as any).processing_started_at = new Date().toISOString();
   }
 
-  if (['accepted', 'rejected', 'unchanged'].includes(status)) {
+  if (['accepted', 'rejected', 'unchanged', 'other'].includes(status)) {
     const now = new Date();
     updates.processed_at = now.toISOString();
 
@@ -223,9 +223,9 @@ export async function updateRequestStatus(
 }
 
 /**
- * Atomic claim: assigns a pending request to an agent ONLY if the agent has no
- * active processing request. Uses a Postgres function with row-level locking
- * to prevent race conditions.
+ * Manual claim: explicitly assigns a pending request to the connected agent.
+ * The server permits a second active request only through this manual path;
+ * automatic assignment is limited to one active request per agent.
  * Returns { data, error } — error.message starts with 'AGENT_BUSY' or 'REQUEST_UNAVAILABLE'.
  */
 export async function claimRequest(requestId: string, agentId: string) {

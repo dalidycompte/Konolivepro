@@ -9,7 +9,8 @@ export interface Profile {
   phone: string | null;
   locality: string | null;
   role: UserRole;
-  is_active: boolean;
+  is_online?: boolean;
+  last_auto_assigned_at?: string | null;
   is_paused?: boolean;
   is_logged_in: boolean;
   login_token: string | null;
@@ -31,6 +32,8 @@ export interface VerificationRequest {
   processed_at: string | null;
   processing_duration_seconds: number | null;
   processing_started_at: string | null;
+  assignment_source?: 'automatic' | 'manual';
+  assigned_at?: string | null;
   applicant?: Profile;
   agent?: Profile;
   /** PostgREST returns array for one-to-many FK; normalise with resolveDocuments() */

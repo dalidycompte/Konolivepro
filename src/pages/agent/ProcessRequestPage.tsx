@@ -875,6 +875,13 @@ export default function ProcessRequestPage() {
           </div>
 
           <StatusBadge status={request.status} className="shrink-0" />
+          <span className={`shrink-0 px-2 py-1 rounded-lg text-[11px] font-semibold ${
+            request.assignment_source === 'automatic'
+              ? 'bg-blue-500/10 text-blue-600'
+              : 'bg-slate-500/10 text-slate-600'
+          }`}>
+            {request.assignment_source === 'automatic' ? 'Automatique' : 'Manuelle'}
+          </span>
         </div>
 
         <div className="max-w-xl mx-auto space-y-6">
