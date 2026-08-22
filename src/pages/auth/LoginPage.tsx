@@ -6,7 +6,7 @@ import { getDashboardPath } from '@/components/common/RouteGuard';
 import { toast } from 'sonner';
 import { Video, Eye, EyeOff, LogIn, Download, Smartphone } from 'lucide-react';
 import { getApkUrl } from '@/lib/api';
-import { checkRateLimit, resetRateLimit, SECURITY } from '@/lib/security';
+import { checkRateLimit, resetRateLimit, sanitizeUsername, SECURITY } from '@/lib/security';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -45,14 +45,25 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    // Supporte email direct (contient @) ou nom d'utilisateur@miaoda.com
-    const email = username.trim().includes('@') ? username.trim() : `${username.trim()}@miaoda.com`;
+    // Supporte un e-mail direct ou le username interne généré à l'inscription.
+    // L'e-mail est normalisé en minuscules pour rester compatible avec les
+    // adresses Auth créées depuis un username saisi avec une majuscule.
+    const identifier = username.trim();
+    const email = identifier.includes('@')
+      ? identifier.toLowerCase()
+      : `${sanitizeUsername(identifier).toLowerCase()}@miaoda.com`;
 
     const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setLoading(false);
-      toast.error('Connexion échouée', { description: 'Identifiant ou mot de passe invalide.' });
+      const code = (error as { code?: string }).code;
+      const description = code === 'email_not_confirmed'
+        ? 'Ce compte doit d’abord être confirmé.'
+        : code === 'user_banned'
+          ? 'Ce compte est suspendu. Contactez un administrateur.'
+          : 'Identifiant ou mot de passe invalide.';
+      toast.error('Connexion échouée', { description });
       return;
     }
 
