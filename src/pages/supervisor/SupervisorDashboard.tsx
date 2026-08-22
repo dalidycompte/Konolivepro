@@ -153,6 +153,7 @@ export default function SupervisorDashboard() {
   const [agentPresence, setAgentPresence] = useState<AgentPresence[]>([]);
   const [presenceLoading, setPresenceLoading] = useState(true);
   const [presenceUpdatedAt, setPresenceUpdatedAt] = useState<Date | null>(null);
+  const [showAgentPresence, setShowAgentPresence] = useState(false);
   const presenceRequestRef = useRef(false);
 
   // Alertes dépassement 7 min
@@ -570,13 +571,20 @@ export default function SupervisorDashboard() {
             {openPanel === 'pending' ? <ChevronUp size={13} className="ml-1" /> : <ChevronDown size={13} className="ml-1" />}
           </button>
 
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Zap size={13} className="text-primary" />
-            Mise à jour en temps réel
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowAgentPresence(value => !value)}
+            aria-expanded={showAgentPresence}
+            className={`flex items-center gap-2 text-xs font-semibold rounded-xl px-3 py-1.5 transition-colors ${showAgentPresence ? 'neu-pressed text-primary' : 'hover:bg-muted/40 text-muted-foreground'}`}
+          >
+            <Users size={13} className="text-primary" />
+            {showAgentPresence ? 'Masquer la présence' : 'Afficher la présence des agents'}
+            {showAgentPresence ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
         </div>
 
-        {/* ── Présence détaillée des agents ─────────────── */}
+        {showAgentPresence && (
+        /* ── Présence détaillée des agents ─────────────── */
         <div className="neu-card overflow-hidden">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
             <div>
@@ -642,6 +650,7 @@ export default function SupervisorDashboard() {
             </div>
           )}
         </div>
+        )}
 
         {/* ── Panel : Demandes en attente ─────────── */}
         {openPanel === 'pending' && (
