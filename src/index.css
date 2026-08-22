@@ -1,0 +1,516 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════
+   KONOLIVE — Système de design Neumorphique
+   Couleur primaire : ROUGE (#e53935)
+   Principe : fond = couleur carte = couleur élément.
+   Seules les ombres doubles créent la profondeur.
+
+   THÈMES DISPONIBLES (classes sur <html>) :
+     (défaut)          → Clair          gris-bleu #e0e5ec  primaire rouge
+     .dark             → Sombre         ardoise   #1e2128  primaire rouge clair
+     .dark.midnight    → Minuit         noir      #12151a  primaire rouge clair
+     .warm             → Marron clair   beige     #e8dfd4  primaire rouge chaud
+     .dark.gray-dark   → Gris sombre   gris      #1c1c1e  primaire rouge moyen
+
+   PAGES AUTH (login/register) :
+     Elles utilisent les variables --auth-* figées (indépendantes du thème).
+   ═══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  /* ══════════════════════════════════════════
+     THÈME PAR DÉFAUT : Clair (gris-bleu pâle)
+     ══════════════════════════════════════════ */
+  :root {
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --radius: 0.875rem;
+
+    /* ── Fond Neumorphique Light ── */
+    --neu-bg:    #e0e5ec;
+    --neu-dark:  #a3b1c6;
+    --neu-light: #ffffff;
+    --neu-text:  #3d4a5c;
+    --neu-muted: #6e7f95;
+
+    /* ── Accent ROUGE primaire ── */
+    --neu-accent:          #e53935;        /* rouge principal         */
+    --neu-accent-light:    #ef5350;        /* rouge hover             */
+    --neu-accent-gradient: linear-gradient(135deg, #e53935, #c62828);
+    --neu-shadow-primary:  0 4px 16px rgba(229, 57, 53, 0.38);
+
+    /* ── Ombres Neumorphiques ── */
+    --neu-shadow-raised: 6px 6px 14px var(--neu-dark), -6px -6px 14px var(--neu-light);
+    --neu-shadow-flat:   3px 3px 7px var(--neu-dark),  -3px -3px 7px var(--neu-light);
+    --neu-shadow-inset:  inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+    --neu-shadow-btn:    4px 4px 10px var(--neu-dark), -4px -4px 10px var(--neu-light);
+
+    /* ── Tokens Tailwind ── */
+    --background:         213 20% 87%;
+    --foreground:         213 18% 28%;
+    --card:               213 20% 87%;
+    --card-foreground:    213 18% 28%;
+    --popover:            213 20% 87%;
+    --popover-foreground: 213 18% 28%;
+
+    /* Primaire ROUGE */
+    --primary:            0 73% 55%;      /* #e53935 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:          213 20% 83%;
+    --secondary-foreground: 213 18% 28%;
+    --muted:              213 20% 83%;
+    --muted-foreground:   213 16% 52%;
+    --accent:             0 73% 55%;
+    --accent-foreground:  0 0% 100%;
+    --destructive:        0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border:             213 18% 78%;
+    --input:              213 20% 87%;
+    --ring:               0 73% 55%;
+
+    /* ── Sidebar ── */
+    --sidebar-background:         220 22% 12%;
+    --sidebar-foreground:         213 15% 70%;
+    --sidebar-primary:            0 73% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:             220 22% 18%;
+    --sidebar-accent-foreground:  0 0% 100%;
+    --sidebar-border:             220 22% 18%;
+    --sidebar-ring:               0 73% 55%;
+
+    /* ── Sémantique ── */
+    --success: 142 55% 45%;
+    --warning:  38 80% 50%;
+    --info:    199 75% 48%;
+
+    /* ── Charts ── */
+    --chart-1: 0 73% 55%;
+    --chart-2: 142 55% 45%;
+    --chart-3: 199 75% 48%;
+    --chart-4:  38 80% 50%;
+    --chart-5: 280 55% 58%;
+
+    /* ── Gradients ── */
+    --gradient-primary:    var(--neu-accent-gradient);
+    --gradient-card:       none;
+    --gradient-background: none;
+    --gradient-sidebar:    linear-gradient(180deg, #181c27 0%, #13161f 100%);
+
+    /* ── Ombres alias ── */
+    --shadow-xs:      var(--neu-shadow-flat);
+    --shadow-sm:      var(--neu-shadow-flat);
+    --shadow-md:      var(--neu-shadow-raised);
+    --shadow-lg:      var(--neu-shadow-raised);
+    --shadow-card:    var(--neu-shadow-raised);
+    --shadow-hover:   var(--neu-shadow-raised);
+    --shadow-primary: var(--neu-shadow-primary);
+
+    --neu-base: var(--neu-bg);
+  }
+
+  /* ══════════════════════════════════════════
+     THÈME SOMBRE — fond ardoise #1e2128
+     ══════════════════════════════════════════ */
+  .dark {
+    --neu-bg:    #1e2128;
+    --neu-dark:  #12151b;
+    --neu-light: #292f3d;
+    --neu-text:  #c8d0e0;
+    --neu-muted: #8a96aa;
+
+    --neu-accent:          #ef5350;
+    --neu-accent-light:    #f44336;
+    --neu-accent-gradient: linear-gradient(135deg, #ef5350, #e53935);
+    --neu-shadow-primary:  0 4px 16px rgba(239, 83, 80, 0.35);
+
+    --neu-shadow-raised: 6px 6px 14px var(--neu-dark),  -6px -6px 14px var(--neu-light);
+    --neu-shadow-flat:   3px 3px 7px var(--neu-dark),   -3px -3px 7px var(--neu-light);
+    --neu-shadow-inset:  inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+    --neu-shadow-btn:    4px 4px 10px var(--neu-dark),  -4px -4px 10px var(--neu-light);
+
+    --background:         222 14% 14%;
+    --foreground:         213 20% 82%;
+    --card:               222 14% 14%;
+    --card-foreground:    213 20% 82%;
+    --popover:            222 14% 14%;
+    --popover-foreground: 213 20% 82%;
+
+    --primary:            0 80% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:          222 14% 19%;
+    --secondary-foreground: 213 20% 75%;
+    --muted:              222 14% 19%;
+    --muted-foreground:   213 12% 55%;
+    --accent:             0 80% 62%;
+    --accent-foreground:  0 0% 100%;
+    --destructive:        0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border:             222 14% 23%;
+    --input:              222 14% 14%;
+    --ring:               0 80% 62%;
+
+    --sidebar-background:         222 18% 9%;
+    --sidebar-foreground:         213 15% 65%;
+    --sidebar-primary:            0 80% 62%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:             222 18% 15%;
+    --sidebar-accent-foreground:  0 0% 100%;
+    --sidebar-border:             222 18% 15%;
+    --sidebar-ring:               0 80% 62%;
+
+    --gradient-primary:    var(--neu-accent-gradient);
+    --shadow-card:  var(--neu-shadow-raised);
+    --shadow-hover: var(--neu-shadow-raised);
+    --shadow-primary: var(--neu-shadow-primary);
+    --neu-base: var(--neu-bg);
+  }
+
+  /* ══════════════════════════════════════════
+     THÈME MINUIT — fond noir profond #12151a
+     ══════════════════════════════════════════ */
+  .dark.midnight {
+    --neu-bg:    #12151a;
+    --neu-dark:  #08090c;
+    --neu-light: #1e2330;
+    --neu-text:  #d0d8e8;
+    --neu-muted: #7a88a0;
+
+    --neu-accent:          #f44336;
+    --neu-accent-light:    #ef5350;
+    --neu-accent-gradient: linear-gradient(135deg, #f44336, #d32f2f);
+    --neu-shadow-primary:  0 4px 18px rgba(244, 67, 54, 0.40);
+
+    --neu-shadow-raised: 6px 6px 14px var(--neu-dark),  -6px -6px 14px var(--neu-light);
+    --neu-shadow-flat:   3px 3px 7px var(--neu-dark),   -3px -3px 7px var(--neu-light);
+    --neu-shadow-inset:  inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+    --neu-shadow-btn:    4px 4px 10px var(--neu-dark),  -4px -4px 10px var(--neu-light);
+
+    --background:         234 16% 9%;
+    --foreground:         213 22% 84%;
+    --card:               234 16% 9%;
+    --card-foreground:    213 22% 84%;
+    --popover:            234 16% 9%;
+    --popover-foreground: 213 22% 84%;
+
+    --primary:            0 82% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:          234 16% 14%;
+    --secondary-foreground: 213 20% 75%;
+    --muted:              234 16% 14%;
+    --muted-foreground:   213 10% 52%;
+    --accent:             0 82% 58%;
+    --accent-foreground:  0 0% 100%;
+    --border:             234 16% 18%;
+    --input:              234 16% 9%;
+    --ring:               0 82% 58%;
+
+    --sidebar-background:         234 18% 6%;
+    --sidebar-accent:             234 18% 12%;
+    --sidebar-border:             234 18% 12%;
+    --sidebar-primary:            0 82% 58%;
+
+    --gradient-primary:    var(--neu-accent-gradient);
+    --shadow-primary: var(--neu-shadow-primary);
+    --neu-base: var(--neu-bg);
+  }
+
+  /* ══════════════════════════════════════════
+     THÈME MARRON CLAIR — fond beige #e8dfd4
+     ══════════════════════════════════════════ */
+  .warm {
+    --neu-bg:    #e8dfd4;
+    --neu-dark:  #b5a898;
+    --neu-light: #fffff8;
+    --neu-text:  #4a3f35;
+    --neu-muted: #7d6e62;
+
+    --neu-accent:          #c0392b;        /* rouge brique chaud       */
+    --neu-accent-light:    #e74c3c;
+    --neu-accent-gradient: linear-gradient(135deg, #c0392b, #96281b);
+    --neu-shadow-primary:  0 4px 16px rgba(192, 57, 43, 0.35);
+
+    --neu-shadow-raised: 6px 6px 14px var(--neu-dark), -6px -6px 14px var(--neu-light);
+    --neu-shadow-flat:   3px 3px 7px var(--neu-dark),  -3px -3px 7px var(--neu-light);
+    --neu-shadow-inset:  inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+    --neu-shadow-btn:    4px 4px 10px var(--neu-dark), -4px -4px 10px var(--neu-light);
+
+    --background:         24 25% 86%;
+    --foreground:         18 18% 25%;
+    --card:               24 25% 86%;
+    --card-foreground:    18 18% 25%;
+    --popover:            24 25% 86%;
+    --popover-foreground: 18 18% 25%;
+
+    --primary:            4 69% 47%;       /* #c0392b */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:          24 25% 82%;
+    --secondary-foreground: 18 18% 25%;
+    --muted:              24 25% 82%;
+    --muted-foreground:   18 12% 50%;
+    --accent:             4 69% 47%;
+    --accent-foreground:  0 0% 100%;
+    --destructive:        0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border:             24 20% 76%;
+    --input:              24 25% 86%;
+    --ring:               4 69% 47%;
+
+    --sidebar-background:         22 25% 14%;
+    --sidebar-foreground:         24 20% 68%;
+    --sidebar-primary:            4 69% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:             22 25% 20%;
+    --sidebar-accent-foreground:  0 0% 100%;
+    --sidebar-border:             22 25% 20%;
+    --sidebar-ring:               4 69% 47%;
+
+    --gradient-primary:    var(--neu-accent-gradient);
+    --shadow-card:  var(--neu-shadow-raised);
+    --shadow-hover: var(--neu-shadow-raised);
+    --shadow-primary: var(--neu-shadow-primary);
+    --neu-base: var(--neu-bg);
+  }
+
+  /* ══════════════════════════════════════════
+     THÈME GRIS SOMBRE — fond #1c1c1e
+     ══════════════════════════════════════════ */
+  .dark.gray-dark {
+    --neu-bg:    #1c1c1e;
+    --neu-dark:  #0d0d0f;
+    --neu-light: #2c2c30;
+    --neu-text:  #d0d0d8;
+    --neu-muted: #808090;
+
+    --neu-accent:          #e53935;
+    --neu-accent-light:    #ef5350;
+    --neu-accent-gradient: linear-gradient(135deg, #e53935, #b71c1c);
+    --neu-shadow-primary:  0 4px 16px rgba(229, 57, 53, 0.38);
+
+    --neu-shadow-raised: 6px 6px 14px var(--neu-dark),  -6px -6px 14px var(--neu-light);
+    --neu-shadow-flat:   3px 3px 7px var(--neu-dark),   -3px -3px 7px var(--neu-light);
+    --neu-shadow-inset:  inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
+    --neu-shadow-btn:    4px 4px 10px var(--neu-dark),  -4px -4px 10px var(--neu-light);
+
+    --background:         240 4% 11%;
+    --foreground:         240 5% 82%;
+    --card:               240 4% 11%;
+    --card-foreground:    240 5% 82%;
+    --popover:            240 4% 11%;
+    --popover-foreground: 240 5% 82%;
+
+    --primary:            0 73% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary:          240 4% 16%;
+    --secondary-foreground: 240 5% 75%;
+    --muted:              240 4% 16%;
+    --muted-foreground:   240 4% 55%;
+    --accent:             0 73% 55%;
+    --accent-foreground:  0 0% 100%;
+    --destructive:        0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border:             240 4% 20%;
+    --input:              240 4% 11%;
+    --ring:               0 73% 55%;
+
+    --sidebar-background:         240 5% 7%;
+    --sidebar-foreground:         240 5% 62%;
+    --sidebar-primary:            0 73% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:             240 5% 13%;
+    --sidebar-accent-foreground:  0 0% 100%;
+    --sidebar-border:             240 5% 13%;
+    --sidebar-ring:               0 73% 55%;
+
+    --gradient-primary:    var(--neu-accent-gradient);
+    --shadow-card:  var(--neu-shadow-raised);
+    --shadow-hover: var(--neu-shadow-raised);
+    --shadow-primary: var(--neu-shadow-primary);
+    --neu-base: var(--neu-bg);
+  }
+
+  /* ══════════════════════════════════════════
+     PAGES AUTH — variables figées (thème-agnostiques)
+     Login & Register utilisent .auth-page pour
+     être TOUJOURS en mode clair #e0e5ec
+     ══════════════════════════════════════════ */
+  .auth-page {
+    --neu-bg:    #e0e5ec !important;
+    --neu-dark:  #a3b1c6 !important;
+    --neu-light: #ffffff !important;
+    --neu-text:  #3d4a5c !important;
+    --neu-muted: #6e7f95 !important;
+
+    --neu-accent:          #e53935 !important;
+    --neu-accent-gradient: linear-gradient(135deg, #e53935, #c62828) !important;
+    --neu-shadow-primary:  0 4px 16px rgba(229, 57, 53, 0.38) !important;
+
+    --neu-shadow-raised: 6px 6px 14px #a3b1c6, -6px -6px 14px #ffffff !important;
+    --neu-shadow-flat:   3px 3px 7px #a3b1c6,  -3px -3px 7px #ffffff !important;
+    --neu-shadow-inset:  inset 4px 4px 8px #a3b1c6, inset -4px -4px 8px #ffffff !important;
+    --neu-shadow-btn:    4px 4px 10px #a3b1c6, -4px -4px 10px #ffffff !important;
+
+    --background:         213 20% 87% !important;
+    --foreground:         213 18% 28% !important;
+    --card:               213 20% 87% !important;
+    --muted-foreground:   213 16% 52% !important;
+    --border:             213 18% 78% !important;
+    --ring:               0 73% 55% !important;
+    --primary:            0 73% 55% !important;
+    --primary-foreground: 0 0% 100% !important;
+
+    --gradient-primary: linear-gradient(135deg, #e53935, #c62828) !important;
+    --shadow-primary: 0 4px 16px rgba(229, 57, 53, 0.38) !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════ */
+@layer base {
+  * { @apply border-border; }
+  *  { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+
+  html { font-family: var(--font-sans); }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    line-height: 1.5;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   COMPOSANTS NEUMORPHIQUES — classes réutilisables
+   ═══════════════════════════════════════════════════════ */
+@layer components {
+
+  /* ── Carte neu (surélevée) ──────────────────────── */
+  .neu-card {
+    background: var(--neu-bg);
+    @apply rounded-2xl p-6;
+    box-shadow: var(--neu-shadow-raised);
+  }
+
+  /* ── Élément plat (même niveau que le fond) ─────── */
+  .neu-flat {
+    background: var(--neu-bg);
+    @apply rounded-xl;
+    box-shadow: var(--neu-shadow-flat);
+  }
+
+  /* ── Élément enfoncé (pressed/inset) ────────────── */
+  .neu-pressed {
+    background: var(--neu-bg);
+    @apply rounded-xl;
+    box-shadow: var(--neu-shadow-inset);
+  }
+
+  /* ── Input Neumorphique (enfoncé) ───────────────── */
+  .neu-input {
+    background: var(--neu-bg);
+    @apply w-full rounded-xl px-4 py-3 text-sm
+           text-foreground placeholder:text-muted-foreground
+           focus:outline-none transition-all duration-200
+           disabled:cursor-not-allowed;
+    box-shadow: var(--neu-shadow-inset);
+    color: var(--neu-text);
+  }
+  .neu-input:focus {
+    box-shadow: var(--neu-shadow-inset), 0 0 0 2px hsl(var(--ring) / 0.35);
+  }
+
+  /* ── Bouton primaire neu (surélevé + accent) ─────── */
+  .neu-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3
+           text-sm font-semibold text-white transition-all duration-200
+           focus-visible:outline-none
+           disabled:pointer-events-none disabled:opacity-50;
+    background: var(--gradient-primary);
+    box-shadow: var(--neu-shadow-btn), var(--neu-shadow-primary);
+  }
+  .neu-btn-primary:hover  { filter: brightness(1.08); transform: translateY(-1px); }
+  .neu-btn-primary:active {
+    transform: translateY(0);
+    box-shadow: var(--neu-shadow-inset);
+  }
+
+  /* ── Bouton secondaire neu ──────────────────────── */
+  .neu-btn-secondary {
+    background: var(--neu-bg);
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3
+           text-sm font-semibold transition-all duration-200
+           focus-visible:outline-none
+           disabled:pointer-events-none disabled:opacity-50;
+    color: var(--neu-text);
+    box-shadow: var(--neu-shadow-btn);
+  }
+  .neu-btn-secondary:hover  { filter: brightness(0.97); }
+  .neu-btn-secondary:active { box-shadow: var(--neu-shadow-inset); }
+
+  /* ── Alias SaaS (pour les autres pages) ─────────── */
+  .saas-card  { @apply neu-card; }
+  .kpi-card   { @apply neu-flat p-5 flex flex-col gap-3; }
+  .saas-input { @apply neu-input; }
+  .saas-btn-primary   { @apply neu-btn-primary; }
+  .saas-btn-outline   { @apply neu-btn-secondary; }
+
+  /* ── Stat card (dashboard KPIs) ─────────────────── */
+  .stat-card {
+    background: var(--neu-bg);
+    @apply rounded-2xl;
+    box-shadow: var(--neu-shadow-raised);
+    transition: box-shadow 0.2s ease;
+  }
+  .stat-card:hover { box-shadow: var(--neu-shadow-raised), 0 0 0 2px hsl(var(--ring) / 0.2); }
+
+  /* ── Badge statut ───────────────────────────────── */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  /* ── Texte dégradé ──────────────────────────────── */
+  .gradient-text {
+    background-image: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Titres de page ─────────────────────────────── */
+  .page-title {
+    @apply text-2xl font-bold tracking-tight;
+    color: var(--neu-text);
+  }
+  .page-subtitle {
+    @apply text-sm;
+    color: var(--neu-muted);
+  }
+
+  /* ── Divider ────────────────────────────────────── */
+  .saas-divider { @apply h-px w-full bg-border my-4; }
+
+  /* ── Avatar initiales ───────────────────────────── */
+  .avatar-initials {
+    @apply flex items-center justify-center rounded-full font-semibold text-white text-sm;
+    background: var(--gradient-primary);
+  }
+}
+
+/* ── transitions CSS allégées ── */
+@layer utilities {
+  .transition-colors { transition-property: color, background-color, border-color, fill, stroke; transition-timing-function: cubic-bezier(0.4,0,0.2,1); transition-duration: 100ms; }
+  .transition-shadow { transition-property: box-shadow; transition-timing-function: cubic-bezier(0.4,0,0.2,1); transition-duration: 120ms; }
+  /* désactive will-change par défaut pour économiser la mémoire GPU */
+  .neu-card, .kpi-card, .stat-card { will-change: auto; }
+  .neu-btn-primary, .neu-btn-secondary { will-change: auto; }
+}
+
