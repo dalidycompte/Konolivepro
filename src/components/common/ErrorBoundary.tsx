@@ -27,9 +27,23 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+
+    // Après un déploiement, un mobile peut conserver un ancien index.html
+    // alors que ses chunks ont changé. Recharger une seule fois avec un
+    // paramètre cache-busting récupère la version cohérente de l’application.
+    const isDynamicImportError = /dynamically imported module|importing a module script failed|failed to fetch dynamically imported module/i.test(error.message);
+    const reloadKey = 'konolive-dynamic-import-retried';
+    if (isDynamicImportError && window.sessionStorage.getItem(reloadKey) !== '1') {
+      window.sessionStorage.setItem(reloadKey, '1');
+      const url = new URL(window.location.href);
+      url.searchParams.set('__konolive_reload', String(Date.now()));
+      window.location.replace(url.toString());
+    }
   }
 
+
   handleReset = () => {
+    window.sessionStorage.removeItem('konolive-dynamic-import-retried');
     this.setState({ hasError: false, error: null });
   };
 
