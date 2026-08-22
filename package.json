@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "echo 'Do not use this command, only use lint to check'",
-    "build": "vite build",
+    "build": "test -n \"$VITE_SUPABASE_URL\" -a -n \"$VITE_SUPABASE_ANON_KEY\" || (echo 'VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY sont requis pour le build' >&2; exit 1); vite build",
     "lint": "tsgo -p tsconfig.check.json; npx biome lint; .rules/check.sh;npx tailwindcss -i ./src/index.css -o /dev/null 2>&1 | grep -E '^(CssSyntaxError|Error):.*' || true;.rules/testBuild.sh"
   },
   "dependencies": {
