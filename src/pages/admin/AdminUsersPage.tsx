@@ -124,9 +124,11 @@ export default function AdminUsersPage() {
             <h1 className="text-2xl font-bold text-foreground text-balance">Gestion des utilisateurs</h1>
             <p className="text-muted-foreground text-sm mt-1">{profiles.length} utilisateur(s) au total.</p>
           </div>
-          <button onClick={() => { setForm(prev => ({ ...prev, role: roleFilter })); setShowCreate(true); }} className="neu-btn-primary flex items-center gap-2 py-2.5 px-5">
-            <Plus size={16} /><span>Créer {roleFilter === 'applicant' ? 'un coach' : 'un agent'}</span>
-          </button>
+          {(roleFilter === 'agent' || roleFilter === 'supervisor') && (
+            <button onClick={() => { setForm(prev => ({ ...prev, role: roleFilter })); setShowCreate(true); }} className="neu-btn-primary flex items-center gap-2 py-2.5 px-5">
+              <Plus size={16} /><span>Créer {roleFilter === 'supervisor' ? 'un superviseur' : 'un agent'}</span>
+            </button>
+          )}
         </div>
 
         {/* Filters */}
@@ -232,8 +234,6 @@ export default function AdminUsersPage() {
               <select className="neu-input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as UserRole }))}>
                 <option value="agent">Agent</option>
                 <option value="supervisor">Superviseur</option>
-                <option value="admin">Admin</option>
-                <option value="applicant">Coach mobile</option>
               </select>
             </div>
             <div className="flex gap-3 pt-2">
