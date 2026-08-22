@@ -68,7 +68,7 @@ export default function LoginPage() {
         .eq('id', authData.user.id);
 
       /* Récupère le profil pour connaître le rôle, puis redirige immédiatement */
-      await refreshProfile();
+      await refreshProfile(authData.user.id);
       const { data: profileData } = await supabase
         .from('profiles')
         .select('role')
