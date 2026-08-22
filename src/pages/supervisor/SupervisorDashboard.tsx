@@ -4,10 +4,10 @@ import MainLayout from '@/components/layouts/MainLayout';
 import {
   getDashboardKpi, getProcessingRequests, getPendingRequests,
   getOnlineAgentProfiles, getPausedAgentProfiles,
-  getOvertimeRequests, transferRequest, getTodayOtherRequests,
+  getAgentPresence, getOvertimeRequests, transferRequest, getTodayOtherRequests,
   getDailyPerformances,
 } from '@/lib/api';
-import type { DashboardKpi, HourlyVolumeRow, ProcessingRequest, PendingRequest, OvertimeRequest, DailyPerformance } from '@/lib/api';
+import type { AgentPresence, AgentPresenceStatus, DashboardKpi, HourlyVolumeRow, ProcessingRequest, PendingRequest, OvertimeRequest, DailyPerformance } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import {
   Users, TrendingUp, Timer, Zap, ChevronDown, ChevronUp,
@@ -61,6 +61,24 @@ function buildConicGradient(slices: { color: string; value: number }[]): string 
 
 type OnlineAgent = { id: string; username: string };
 type Panel       = 'processing' | 'online' | 'paused' | 'pending' | null;
+
+const AGENT_STATUS_ORDER: AgentPresenceStatus[] = ['available', 'processing', 'paused', 'disconnected', 'offline'];
+const AGENT_STATUS_META: Record<AgentPresenceStatus, { label: string; dot: string; text: string; bg: string }> = {
+  available:    { label: 'En ligne et disponible', dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-500/10' },
+  processing:   { label: 'En cours de traitement',  dot: 'bg-blue-500',    text: 'text-blue-700',    bg: 'bg-blue-500/10' },
+  paused:       { label: 'En pause',                dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-500/10' },
+  disconnected: { label: 'Déconnecté',              dot: 'bg-red-500',     text: 'text-red-700',     bg: 'bg-red-500/10' },
+  offline:      { label: 'Hors ligne',              dot: 'bg-slate-400',   text: 'text-slate-600',   bg: 'bg-slate-500/10' },
+};
+
+function getAgentPresenceStatus(agent: AgentPresence): AgentPresenceStatus {
+  if (!agent.is_active) return 'offline';
+  if (!agent.is_logged_in) return 'disconnected';
+  if (!agent.is_online) return 'offline';
+  if (agent.is_paused) return 'paused';
+  if (agent.active_requests > 0) return 'processing';
+  return 'available';
+}
 
 interface TransferTarget { requestId: string; applicantLabel: string; agentLabel: string }
 
@@ -131,6 +149,12 @@ export default function SupervisorDashboard() {
   const [pausedAgents, setPausedAgents]   = useState<OnlineAgent[]>([]);
   const [panelLoading, setPanelLoading]   = useState(false);
 
+  // Présence détaillée : mise à jour silencieuse, sans skeleton ni remontée de page.
+  const [agentPresence, setAgentPresence] = useState<AgentPresence[]>([]);
+  const [presenceLoading, setPresenceLoading] = useState(true);
+  const [presenceUpdatedAt, setPresenceUpdatedAt] = useState<Date | null>(null);
+  const presenceRequestRef = useRef(false);
+
   // Alertes dépassement 7 min
   const [overtimeReqs, setOvertimeReqs]   = useState<OvertimeRequest[]>([]);
 
@@ -180,7 +204,29 @@ export default function SupervisorDashboard() {
     setOvertimeReqs(data);
   }, []);
 
-  useEffect(() => { load(); loadOvertime(); }, [load, loadOvertime]);
+  const loadPresence = useCallback(async () => {
+    if (presenceRequestRef.current) return;
+    presenceRequestRef.current = true;
+    try {
+      const data = await getAgentPresence();
+      setAgentPresence(data);
+      setPresenceUpdatedAt(new Date());
+    } catch (error) {
+      console.error('Erreur de présence agents:', error);
+    } finally {
+      presenceRequestRef.current = false;
+      setPresenceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); loadOvertime(); loadPresence(); }, [load, loadOvertime, loadPresence]);
+
+  // Filet de sécurité à 1 seconde : le temps réel reste instantané, le polling
+  // garantit la convergence même si un événement WebSocket est manqué.
+  useEffect(() => {
+    const timer = window.setInterval(loadPresence, 1000);
+    return () => window.clearInterval(timer);
+  }, [loadPresence]);
 
   // Ref pour éviter les dépendances instables dans le useEffect realtime
   const openPanelRef = useRef<Panel>(null);
@@ -188,11 +234,12 @@ export default function SupervisorDashboard() {
 
   // Temps réel Supabase — canaux stables, jamais re-souscrits
   useEffect(() => {
-    // Canal 1 : verification_requests → recharge les KPI
+    // Canal 1 : verification_requests → recharge les KPI et la présence.
     const chReq = supabase.channel('supervisor-kpi-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'verification_requests' }, () => {
         load();
         loadOvertime();
+        loadPresence();
         if (openPanelRef.current === 'processing') loadProcessing();
         if (openPanelRef.current === 'online')     loadOnline();
         if (showOtherModalRef.current) openOtherModal();
@@ -210,8 +257,10 @@ export default function SupervisorDashboard() {
               });
            }
         })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' },
         payload => {
+          loadPresence();
+          if (payload.eventType !== 'UPDATE') return;
           const updated = payload.new as {
             id: string; username: string; is_online: boolean; is_paused: boolean; role: string;
           };
@@ -258,7 +307,7 @@ export default function SupervisorDashboard() {
       supabase.removeChannel(chReq);
       supabase.removeChannel(chProfiles);
     };
-  }, [load]); // openPanel retiré des deps → canal stable
+  }, [load, loadPresence]); // openPanel retiré des deps → canal stable
 
   // ── Compte à rebours + réinitialisation à minuit ─────
   useEffect(() => {
@@ -375,6 +424,15 @@ export default function SupervisorDashboard() {
   const onlineCount     = kpi?.agents_online ?? 0;
   const pendingCount    = kpi?.pending ?? 0;
   const pendingAlert    = pendingCount > 10;
+
+  const presenceRows = agentPresence.map(agent => ({
+    ...agent,
+    status: getAgentPresenceStatus(agent),
+  }));
+  const presenceCounts = AGENT_STATUS_ORDER.reduce<Record<AgentPresenceStatus, number>>((acc, status) => {
+    acc[status] = presenceRows.filter(agent => agent.status === status).length;
+    return acc;
+  }, { available: 0, processing: 0, paused: 0, disconnected: 0, offline: 0 });
 
   return (
     <MainLayout>
@@ -516,6 +574,73 @@ export default function SupervisorDashboard() {
             <Zap size={13} className="text-primary" />
             Mise à jour en temps réel
           </div>
+        </div>
+
+        {/* ── Présence détaillée des agents ─────────────── */}
+        <div className="neu-card overflow-hidden">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-bold text-base text-foreground flex items-center gap-2">
+                <span className="relative flex h-3 w-3 shrink-0">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+                </span>
+                Présence des agents
+              </h2>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Synchronisation temps réel · vérification automatique chaque seconde
+              </p>
+            </div>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {presenceUpdatedAt ? `Dernière mise à jour ${presenceUpdatedAt.toLocaleTimeString('fr-FR')}` : 'Connexion en cours…'}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4" aria-label="Légende des statuts agents">
+            {AGENT_STATUS_ORDER.map(status => {
+              const meta = AGENT_STATUS_META[status];
+              return (
+                <span key={status} className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.bg} ${meta.text}`}>
+                  <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                  {meta.label}
+                  <span className="tabular-nums opacity-75">{presenceCounts[status]}</span>
+                </span>
+              );
+            })}
+          </div>
+
+          {presenceLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" aria-label="Chargement de la présence">
+              {[1, 2, 3].map(i => <div key={i} className="h-[76px] rounded-xl bg-muted/40" />)}
+            </div>
+          ) : presenceRows.length === 0 ? (
+            <div className="min-h-[76px] flex items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+              Aucun agent enregistré.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {presenceRows.map(agent => {
+                const meta = AGENT_STATUS_META[agent.status];
+                return (
+                  <div key={agent.id} className="min-h-[76px] rounded-xl border border-border/70 px-3 py-2.5 flex items-center gap-3 transition-colors duration-150" style={{ background: agent.status === 'offline' ? undefined : 'hsl(var(--muted)/0.16)' }}>
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${meta.bg}`}>
+                      <span className={`w-3 h-3 rounded-full ${meta.dot} ${agent.status === 'available' || agent.status === 'processing' ? 'shadow-[0_0_7px_2px_rgba(16,185,129,0.35)]' : ''}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground truncate">{agent.username}</p>
+                        <span className={`shrink-0 text-[10px] font-bold ${meta.text}`}>{meta.label}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {agent.locality ?? 'Localité non renseignée'}
+                        {agent.active_requests > 0 && ` · ${agent.active_requests} demande${agent.active_requests > 1 ? 's' : ''} en cours`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── Panel : Demandes en attente ─────────── */}

@@ -67,6 +67,52 @@ export interface PendingRequest {
   created_at: string;
 }
 
+export type AgentPresenceStatus = 'available' | 'processing' | 'paused' | 'disconnected' | 'offline';
+
+export interface AgentPresence {
+  id: string;
+  username: string;
+  locality: string | null;
+  is_active: boolean;
+  is_online: boolean;
+  is_logged_in: boolean;
+  is_paused: boolean;
+  active_requests: number;
+}
+
+/** Snapshot complet de présence des agents, fusionné avec les demandes en cours. */
+export async function getAgentPresence(): Promise<AgentPresence[]> {
+  const [{ data: profiles, error: profilesError }, { data: processing, error: processingError }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, username, locality, is_active, is_online, is_logged_in, is_paused')
+      .eq('role', 'agent')
+      .order('username', { ascending: true }),
+    supabase
+      .from('verification_requests')
+      .select('agent_id')
+      .eq('status', 'processing')
+      .not('agent_id', 'is', null),
+  ]);
+
+  if (profilesError || processingError || !Array.isArray(profiles)) return [];
+  const activeByAgent = new Map<string, number>();
+  (processing ?? []).forEach((row: { agent_id: string | null }) => {
+    if (row.agent_id) activeByAgent.set(row.agent_id, (activeByAgent.get(row.agent_id) ?? 0) + 1);
+  });
+
+  return profiles.map((p: any) => ({
+    id: p.id,
+    username: p.username ?? p.id,
+    locality: p.locality ?? null,
+    is_active: p.is_active !== false,
+    is_online: p.is_online === true,
+    is_logged_in: p.is_logged_in === true,
+    is_paused: p.is_paused === true,
+    active_requests: activeByAgent.get(p.id) ?? 0,
+  }));
+}
+
 /** Demandes en attente */
 export async function getPendingRequests(): Promise<PendingRequest[]> {
   const { data } = await supabase
@@ -137,6 +183,8 @@ export async function getOnlineAgentProfiles(): Promise<{ id: string; username: 
     .from('profiles')
     .select('id, username')
     .eq('role', 'agent')
+    .eq('is_active', true)
+    .eq('is_logged_in', true)
     .eq('is_online', true)
     .eq('is_paused', false);
   if (!Array.isArray(data)) return [];
@@ -149,6 +197,8 @@ export async function getPausedAgentProfiles(): Promise<{ id: string; username: 
     .from('profiles')
     .select('id, username')
     .eq('role', 'agent')
+    .eq('is_active', true)
+    .eq('is_logged_in', true)
     .eq('is_online', true)
     .eq('is_paused', true);
   if (!Array.isArray(data)) return [];

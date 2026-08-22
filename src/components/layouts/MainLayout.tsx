@@ -218,6 +218,14 @@ const SidebarContent = memo(function SidebarContent({ onNavigate }: { onNavigate
         return;
       }
     }
+    // Marquer explicitement la session comme déconnectée avant de quitter,
+    // afin que le superviseur voie « Déconnecté » et non seulement « Hors ligne ».
+    await supabase.from('profiles').update({
+      is_logged_in: false,
+      login_token: null,
+      is_online: false,
+      is_paused: false,
+    }).eq('id', profile?.id ?? '');
     await signOut();
     navigate('/login');
   };
@@ -384,7 +392,7 @@ export default function MainLayout({ children, hideSidebar }: { children: React.
     const supabaseUrl    = import.meta.env.VITE_SUPABASE_URL as string;
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-    const setOnline  = () => supabase.from('profiles').update({ is_online: true,  is_paused: false }).eq('id', profile.id);
+    const setOnline  = () => supabase.from('profiles').update({ is_logged_in: true, is_online: true,  is_paused: false }).eq('id', profile.id);
     const setOffline = () => supabase.from('profiles').update({ is_online: false, is_paused: false }).eq('id', profile.id);
 
     // fetch keepalive → garantit le PATCH à la fermeture
