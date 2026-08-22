@@ -1027,9 +1027,9 @@ export default function SupervisorDashboard() {
 
           {/* 3 colonnes 3D */}
           {(() => {
-            const total   = extraStats?.coach.total   ?? 0;
-            const online  = extraStats?.coach.online  ?? 0;
-            const offline = extraStats?.coach.offline ?? 0;
+            const total   = extraStats?.coach?.total   ?? 0;
+            const online  = extraStats?.coach?.online  ?? 0;
+            const offline = extraStats?.coach?.offline ?? 0;
             const maxVal  = Math.max(total, online, offline, 1);
             const cols = [
               { label: 'Inscrits',    value: total,   color: '#e53935', glow: 'rgba(229,57,53,0.35)',   bar: '#e53935' },
@@ -1085,7 +1085,7 @@ export default function SupervisorDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {extraStats.locality.map((loc, idx) => (
+                  {(extraStats?.locality ?? []).map((loc, idx) => (
                     <tr key={idx} style={{ borderBottom: '1px solid hsl(var(--border) / 0.4)' }}>
                       <td className="px-4 py-2.5 font-semibold whitespace-nowrap" style={{ color: 'var(--neu-text)' }}>
                         <span className="inline-flex items-center gap-2">
