@@ -693,9 +693,22 @@ export function resolveDocuments(req: VerificationRequest): RequestDocument | nu
 }
 
 // ─── STORAGE ─────────────────────────────────────────────
-export async function uploadFile(bucket: string, path: string, file: File): Promise<string | null> {
-  const { data, error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true, contentType: file.type });
-  if (error || !data) return null;
+export async function uploadFile(bucket: string, path: string, file: File): Promise<string> {
+  const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+    upsert: true,
+    contentType: file.type || 'image/jpeg',
+  });
+  if (error) {
+    console.error(`[storage:${bucket}] upload failed`, error);
+    if (error.message.toLowerCase().includes('bucket not found')) {
+      throw new Error(`Le stockage « ${bucket} » n'est pas configuré sur Supabase. Appliquez la migration 00007_create_request_storage.sql.`);
+    }
+    if (error.message.includes('row-level security') || error.message.includes('not authorized')) {
+      throw new Error(`Permissions de stockage refusées pour « ${bucket} ». Vérifiez les politiques RLS Supabase.`);
+    }
+    throw new Error(`Téléversement impossible pour « ${bucket} » : ${error.message}`);
+  }
+  if (!data?.path) throw new Error(`Téléversement impossible pour « ${bucket} » : réponse vide de Supabase.`);
   const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
   return urlData.publicUrl;
 }
