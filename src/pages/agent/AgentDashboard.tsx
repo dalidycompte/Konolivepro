@@ -468,7 +468,7 @@ export default function AgentDashboard() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{r.phone_to_certify}</p>
                         <p className="text-xs text-primary truncate">
-                          {r.assignment_source === 'automatic' ? 'Attribution automatique' : 'Prise manuelle'} · Cliquez pour traiter
+                          {r.assignment_source === 'automatic' ? 'Attribution automatique' : 'Prise manuelle'} · Ouverture automatique du traitement
                         </p>
                       </div>
                       <StatusBadge status={r.status} />

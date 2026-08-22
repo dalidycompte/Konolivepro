@@ -113,48 +113,67 @@ const SidebarContent = memo(function SidebarContent({ onNavigate }: { onNavigate
   }, [role]);
 
   useEffect(() => {
-    if (role === 'agent' && profile) {
-      const checkProcessing = async () => {
-        const { count } = await supabase
-          .from('verification_requests')
-          .select('id', { count: 'exact', head: true })
-          .eq('agent_id', profile.id)
-          .eq('status', 'processing');
-        setIsProcessingLocked((count || 0) > 0);
-      };
-      checkProcessing();
+    if (role !== 'agent' || !profile) return;
 
-      const channel = supabase.channel(`main-layout-req-${profile.id}-${Math.random()}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'verification_requests', filter: `agent_id=eq.${profile.id}` },
-          (payload: any) => {
-            checkProcessing();
-            
-            // Auto-redirect to Process page if a request is assigned and agent is not paused
-            if ((payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') && payload.new.status === 'processing' && !profile.is_paused) {
-              
-              // Notify agent if app is in background
-              if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-                new Notification('Nouvelle demande Konolive', {
-                  body: 'Une nouvelle demande vous a été attribuée.',
-                  icon: '/favicon.png',
-                });
-              }
+    let disposed = false;
+    const checkProcessing = async () => {
+      const { count } = await supabase
+        .from('verification_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('agent_id', profile.id)
+        .eq('status', 'processing');
+      if (!disposed) setIsProcessingLocked((count || 0) > 0);
+    };
 
-              if (!location.pathname.startsWith('/agent/process/')) {
-                navigate(`/agent/process/${payload.new.id}`);
-              }
+    const openActiveRequest = async () => {
+      if (disposed || profile.is_paused) return;
+      const { data } = await supabase
+        .from('verification_requests')
+        .select('id')
+        .eq('agent_id', profile.id)
+        .eq('status', 'processing')
+        .order('assigned_at', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (disposed || !data?.id || profile.is_paused) return;
+      const currentId = location.pathname.match(/^\/agent\/process\/([^/]+)/)?.[1] ?? null;
+      if (currentId !== data.id) {
+        navigate(`/agent/process/${data.id}`);
+      }
+    };
+
+    // Rattrape une attribution effectuée avant le montage de l’abonnement realtime.
+    checkProcessing();
+    openActiveRequest();
+    const recoveryTimer = window.setInterval(openActiveRequest, 2000);
+
+    const channel = supabase.channel(`main-layout-req-${profile.id}-${Math.random()}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'verification_requests', filter: `agent_id=eq.${profile.id}` },
+        (payload: any) => {
+          checkProcessing();
+          if ((payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') && payload.new.status === 'processing') {
+            if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+              new Notification('Nouvelle demande Konolive', {
+                body: 'Une nouvelle demande vous a été attribuée.',
+                icon: '/favicon.png',
+              });
             }
+            openActiveRequest();
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      return () => { 
-        supabase.removeChannel(channel).catch(err => console.warn('Erreur lors du nettoyage du canal:', err)); 
-      };
-    }
-  }, [profile, role, navigate]);
+    return () => {
+      disposed = true;
+      window.clearInterval(recoveryTimer);
+      supabase.removeChannel(channel).catch(err => console.warn('Erreur lors du nettoyage du canal:', err));
+    };
+  }, [profile, role, navigate, location.pathname]);
 
   useEffect(() => {
     if (!profile || (role !== 'agent' && role !== 'supervisor' && role !== 'admin')) return;
