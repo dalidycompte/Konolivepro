@@ -49,11 +49,30 @@ export default function LoginPage() {
     // L'e-mail est normalisé en minuscules pour rester compatible avec les
     // adresses Auth créées depuis un username saisi avec une majuscule.
     const identifier = username.trim();
-    const email = identifier.includes('@')
+    const normalizedIdentifier = identifier.includes('@')
       ? identifier.toLowerCase()
-      : `${sanitizeUsername(identifier).toLowerCase()}@miaoda.com`;
+      : sanitizeUsername(identifier).toLowerCase();
+    const candidateEmails = identifier.includes('@')
+      ? [normalizedIdentifier]
+      : [
+          `${normalizedIdentifier}@miaoda.com`,
+          // Compatibilité avec l’ancien domaine utilisé pour le compte admin.
+          `${normalizedIdentifier}@idriss.com`,
+        ];
 
-    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+    let authResult = await supabase.auth.signInWithPassword({
+      email: candidateEmails[0],
+      password,
+    });
+    // Les comptes historiques peuvent avoir un domaine différent. On ne
+    // tente le second domaine qu’en cas d’identifiants invalides.
+    if (authResult.error?.code === 'invalid_credentials' && candidateEmails[1]) {
+      authResult = await supabase.auth.signInWithPassword({
+        email: candidateEmails[1],
+        password,
+      });
+    }
+    const { data: authData, error } = authResult;
 
     if (error) {
       setLoading(false);
