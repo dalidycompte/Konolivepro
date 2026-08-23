@@ -13,7 +13,7 @@ import {
   Users, TrendingUp, Timer, Zap, ChevronDown, ChevronUp,
   Clock, AlertCircle, Loader2, X, Activity,
   AlertTriangle, ArrowRightLeft, Check, MoreHorizontal,
-  MapPin, UserCircle, BarChart2 } from 'lucide-react';
+  MapPin, UserCircle, BarChart2, CalendarDays } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { format, formatDistanceStrict } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -108,6 +108,24 @@ function formatCountdown(ms: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function getCongoDateKey(date = new Date()): string {
+  return new Intl.DateTimeFormat('fr-CA', {
+    timeZone: 'Africa/Brazzaville',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function formatLocalityDateLabel(dateKey: string): string {
+  if (dateKey === getCongoDateKey()) return "Aujourd'hui";
+  try {
+    return format(new Date(`${dateKey}T12:00:00`), 'dd/MM/yyyy', { locale: fr });
+  } catch {
+    return dateKey;
+  }
+}
+
 function TimeElapsed({ startTime }: { startTime: string }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -136,6 +154,9 @@ export default function SupervisorDashboard() {
   const [hourly, setHourly]               = useState<HourlyVolumeRow[]>([]);
   const [loading, setLoading]             = useState(true);
   const [extraStats, setExtraStats]       = useState<{ coach: CoachStat, locality: LocalityStat[] } | null>(null);
+  const [localityDate, setLocalityDate]   = useState(() => getCongoDateKey());
+  const [localityStats, setLocalityStats] = useState<LocalityStat[]>([]);
+  const [localityLoading, setLocalityLoading] = useState(false);
   const [now, setNow]                     = useState(new Date());
   const [countdown, setCountdown]         = useState(msUntilMidnight());
   const countdownRef                      = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -205,6 +226,22 @@ export default function SupervisorDashboard() {
     setOvertimeReqs(data);
   }, []);
 
+  const loadLocalityStats = useCallback(async () => {
+    setLocalityLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_internal_locality_daily_stats', {
+        p_date: localityDate,
+      });
+      if (error) throw error;
+      setLocalityStats(Array.isArray(data) ? data as LocalityStat[] : []);
+    } catch (error) {
+      console.error('Erreur statistiques quotidiennes par localité:', error);
+      setLocalityStats([]);
+    } finally {
+      setLocalityLoading(false);
+    }
+  }, [localityDate]);
+
   const loadPresence = useCallback(async () => {
     if (presenceRequestRef.current) return;
     presenceRequestRef.current = true;
@@ -221,6 +258,7 @@ export default function SupervisorDashboard() {
   }, []);
 
   useEffect(() => { load(); loadOvertime(); loadPresence(); }, [load, loadOvertime, loadPresence]);
+  useEffect(() => { loadLocalityStats(); }, [loadLocalityStats]);
 
   // Filet de sécurité à 1 seconde : le temps réel reste instantané, le polling
   // garantit la convergence même si un événement WebSocket est manqué.
@@ -241,6 +279,7 @@ export default function SupervisorDashboard() {
         load();
         loadOvertime();
         loadPresence();
+        loadLocalityStats();
         if (openPanelRef.current === 'processing') loadProcessing();
         if (openPanelRef.current === 'online')     loadOnline();
         if (showOtherModalRef.current) openOtherModal();
@@ -308,7 +347,7 @@ export default function SupervisorDashboard() {
       supabase.removeChannel(chReq);
       supabase.removeChannel(chProfiles);
     };
-  }, [load, loadPresence]); // openPanel retiré des deps → canal stable
+  }, [load, loadPresence, loadLocalityStats]); // openPanel retiré des deps → canal stable
 
   // ── Compte à rebours + réinitialisation à minuit ─────
   useEffect(() => {
@@ -1245,8 +1284,20 @@ export default function SupervisorDashboard() {
               <MapPin size={18} className="text-primary" />
               Statistiques par localité
               <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: 'hsl(var(--primary)/0.12)', color: 'hsl(var(--primary))' }}>
-                Aujourd'hui
+                {formatLocalityDateLabel(localityDate)}
               </span>
+              <label className="inline-flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--neu-muted)' }}>
+                <CalendarDays size={15} className="text-primary" />
+                <span className="sr-only">Date des statistiques par localité</span>
+                <input
+                  type="date"
+                  value={localityDate}
+                  max={getCongoDateKey()}
+                  onChange={e => setLocalityDate(e.target.value || getCongoDateKey())}
+                  className="h-8 rounded-lg border px-2 text-xs font-semibold bg-background"
+                  style={{ borderColor: 'hsl(var(--border))', color: 'var(--neu-text)' }}
+                />
+              </label>
             </h2>
             <div className="flex items-center gap-3 flex-wrap">
               {[
@@ -1287,14 +1338,20 @@ export default function SupervisorDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {(!extraStats?.locality || extraStats.locality.length === 0) ? (
+                {localityLoading ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--neu-muted)' }}>
-                      Aucune donnée de localité pour aujourd'hui.
+                      Chargement des résultats du {formatLocalityDateLabel(localityDate).toLowerCase()}…
+                    </td>
+                  </tr>
+                ) : localityStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--neu-muted)' }}>
+                      Aucune donnée de localité pour le {formatLocalityDateLabel(localityDate).toLowerCase()}.
                     </td>
                   </tr>
                 ) : (
-                  extraStats.locality.map((loc, idx) => {
+                  localityStats.map((loc, idx) => {
                     const treated = loc.accepted + loc.rejected;
                     const rate    = treated > 0 ? Math.round((loc.accepted / treated) * 100) : null;
                     const isEven  = idx % 2 === 0;
@@ -1367,12 +1424,12 @@ export default function SupervisorDashboard() {
                 )}
               </tbody>
               {/* Pied de tableau — totaux */}
-              {extraStats?.locality && extraStats.locality.length > 0 && (() => {
-                const totRec  = extraStats.locality.reduce((s,l) => s + l.received,  0);
-                const totAcc  = extraStats.locality.reduce((s,l) => s + l.accepted,  0);
-                const totRej  = extraStats.locality.reduce((s,l) => s + l.rejected,  0);
-                const totUnch = extraStats.locality.reduce((s,l) => s + l.unchanged, 0);
-                const totAut  = extraStats.locality.reduce((s,l) => s + l.autres,    0);
+              {localityStats.length > 0 && (() => {
+                const totRec  = localityStats.reduce((s,l) => s + l.received,  0);
+                const totAcc  = localityStats.reduce((s,l) => s + l.accepted,  0);
+                const totRej  = localityStats.reduce((s,l) => s + l.rejected,  0);
+                const totUnch = localityStats.reduce((s,l) => s + l.unchanged, 0);
+                const totAut  = localityStats.reduce((s,l) => s + l.autres,    0);
                 const totRate = (totAcc + totRej) > 0 ? Math.round((totAcc / (totAcc + totRej)) * 100) : null;
                 return (
                   <tfoot>
