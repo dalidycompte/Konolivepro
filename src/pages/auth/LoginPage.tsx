@@ -52,26 +52,27 @@ export default function LoginPage() {
     const normalizedIdentifier = identifier.includes('@')
       ? identifier.toLowerCase()
       : sanitizeUsername(identifier).toLowerCase();
-    const candidateEmails = identifier.includes('@')
-      ? [normalizedIdentifier]
-      : [
-          `${normalizedIdentifier}@miaoda.com`,
-          // Compatibilité avec l’ancien domaine utilisé pour le compte admin.
-          `${normalizedIdentifier}@idriss.com`,
-        ];
+    let candidateEmails: string[];
+    if (identifier.includes('@')) {
+      candidateEmails = [normalizedIdentifier];
+    } else {
+      // La RPC retrouve l’e-mail réellement créé dans Auth, y compris pour
+      // les comptes historiques qui n’utilisent pas @miaoda.com.
+      const { data: resolvedEmail } = await supabase.rpc('resolve_login_email', {
+        p_username: sanitizeUsername(identifier),
+      });
+      candidateEmails = resolvedEmail
+        ? [String(resolvedEmail).toLowerCase()]
+        : [
+            `${normalizedIdentifier}@miaoda.com`,
+            `${normalizedIdentifier}@idriss.com`,
+          ];
+    }
 
     let authResult = await supabase.auth.signInWithPassword({
       email: candidateEmails[0],
       password,
     });
-    // Les comptes historiques peuvent avoir un domaine différent. On ne
-    // tente le second domaine qu’en cas d’identifiants invalides.
-    if (authResult.error?.code === 'invalid_credentials' && candidateEmails[1]) {
-      authResult = await supabase.auth.signInWithPassword({
-        email: candidateEmails[1],
-        password,
-      });
-    }
     const { data: authData, error } = authResult;
 
     if (error) {
