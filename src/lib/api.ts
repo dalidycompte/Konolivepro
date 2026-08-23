@@ -910,14 +910,20 @@ export async function getProcessingOptions() {
 }
 
 export async function addProcessingOption(column_name: string, option_value: string) {
-  const { data, error } = await supabase.from('processing_options').insert({ column_name, option_value }).select('id,column_name,option_value,created_at').single();
+  const { data, error } = await supabase.rpc('add_processing_option', {
+    p_column_name: column_name,
+    p_option_value: option_value,
+  });
   if (error) throw error;
   return data as ProcessingOption;
 }
 
 export async function removeProcessingOption(id: string) {
-  const { error } = await supabase.from('processing_options').delete().eq('id', id);
+  const { data, error } = await supabase.rpc('remove_processing_option', {
+    p_option_id: id,
+  });
   if (error) throw error;
+  if (data !== true) throw new Error('Option introuvable ou déjà supprimée');
 }
 
 export async function saveProcessingDetails(details: ProcessingDetails) {

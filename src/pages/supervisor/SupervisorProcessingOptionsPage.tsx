@@ -43,7 +43,14 @@ export default function SupervisorProcessingOptionsPage() {
 
   const handleAddOption = async (column_name: string) => {
     const val = newValues[column_name]?.trim();
-    if (!val) return;
+    if (!val) {
+      toast.error('Saisissez une option avant de cliquer sur +');
+      return;
+    }
+    if (val.length > 200) {
+      toast.error('L’option ne doit pas dépasser 200 caractères');
+      return;
+    }
     
     setAdding(prev => ({ ...prev, [column_name]: true }));
     try {
@@ -55,8 +62,10 @@ export default function SupervisorProcessingOptionsPage() {
       console.error(err);
       if (err.code === '23505') {
         toast.error('Cette option existe déjà');
+      } else if (err.code === '42501') {
+        toast.error('Droits insuffisants', { description: 'Seuls un superviseur actif ou un administrateur peuvent ajouter une option.' });
       } else {
-        toast.error('Erreur lors de l\'ajout de l\'option');
+        toast.error('Erreur lors de l\'ajout de l\'option', { description: err.message || 'La modification n’a pas été enregistrée.' });
       }
     } finally {
       setAdding(prev => ({ ...prev, [column_name]: false }));
@@ -70,7 +79,7 @@ export default function SupervisorProcessingOptionsPage() {
       toast.success('Option supprimée');
     } catch (err) {
       console.error(err);
-      toast.error('Erreur lors de la suppression');
+      toast.error('Erreur lors de la suppression', { description: err?.message || 'La modification n’a pas été enregistrée.' });
     }
   };
 
@@ -113,7 +122,8 @@ export default function SupervisorProcessingOptionsPage() {
                       onChange={e => setNewValues(prev => ({ ...prev, [col.id]: e.target.value }))}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
-                          handleAddOption(col.id);
+                          e.preventDefault();
+                          void handleAddOption(col.id);
                         }
                       }}
                       className="text-sm h-9"
