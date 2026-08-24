@@ -71,6 +71,7 @@ export default function SupervisorSettingsPage() {
   const [periodDirty, setPeriodDirty]               = useState(false);
   const [periodLoading, setPeriodLoading]           = useState(false);
   const [showHistory, setShowHistory]               = useState(false);
+  const [periodSaveConfirmed, setPeriodSaveConfirmed] = useState(false);
 
   // ── Charger les paramètres depuis la DB ──────────────
   const load = useCallback(async () => {
@@ -114,21 +115,31 @@ export default function SupervisorSettingsPage() {
 
   // ── Sauvegarder la période de travail ─────────────────
   async function saveWorkPeriod() {
-    if (!profile) return;
+    if (!profile) {
+      toast.error('Votre session a expiré. Reconnectez-vous avant de sauvegarder.');
+      return;
+    }
     const startDay = parseInt(periodStartDay, 10);
     if (isNaN(startDay) || startDay < 1 || startDay > 28) {
       toast.error('Le jour de début doit être entre 1 et 28.');
       return;
     }
     setPeriodSaving(true);
-    const ok = await saveWorkPeriodConfig({ start_day: startDay }, profile.id);
-    if (ok) {
-      toast.success('Période de travail / Paie sauvegardée.');
+    try {
+      const ok = await saveWorkPeriodConfig({ start_day: startDay }, profile.id);
+      if (!ok) {
+        toast.error('Échec de la sauvegarde de la période.');
+        return;
+      }
       await loadWorkPeriod();
-    } else {
-      toast.error('Échec de la sauvegarde de la période.');
+      setPeriodSaveConfirmed(true);
+      toast.success('Cycle sauvegardé avec succès.');
+    } catch (error) {
+      console.error('Erreur sauvegarde cycle:', error);
+      toast.error('Échec de la sauvegarde de la période. Réessayez dans quelques instants.');
+    } finally {
+      setPeriodSaving(false);
     }
-    setPeriodSaving(false);
   }
 
   function fmtDate(iso?: string) {
@@ -746,7 +757,12 @@ export default function SupervisorSettingsPage() {
                       <span className="text-sm text-muted-foreground shrink-0">Le</span>
                       <select
                         value={periodStartDay}
-                        onChange={e => { setPeriodStartDay(e.target.value); setPeriodDirty(true); }}
+                        onChange={e => {
+                          const nextDay = e.target.value;
+                          setPeriodStartDay(nextDay);
+                          setPeriodDirty(nextDay !== String(workPeriod?.start_day ?? '15'));
+                          setPeriodSaveConfirmed(false);
+                        }}
                         className="neu-input text-sm w-24 px-3 py-2 font-semibold"
                       >
                         {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
@@ -861,10 +877,28 @@ export default function SupervisorSettingsPage() {
               )}
 
               {periodDirty && (
-                <div className="neu-pressed flex items-center gap-3 px-4 py-3 rounded-xl border-l-4 border-primary/60 animate-in slide-in-from-top-2">
+                <div className="neu-pressed flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-xl border-l-4 border-primary/60 animate-in slide-in-from-top-2">
                   <CalendarDays size={16} className="text-primary shrink-0" />
-                  <p className="text-sm text-muted-foreground">
-                    Modifications non sauvegardées — cliquez sur <strong>Sauvegarder</strong> pour appliquer.
+                  <p className="text-sm text-muted-foreground flex-1">
+                    Modifications non sauvegardées. Sauvegardez maintenant pour appliquer le nouveau cycle.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={saveWorkPeriod}
+                    disabled={periodSaving}
+                    className="neu-btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm shrink-0 disabled:opacity-50"
+                  >
+                    {periodSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                    Sauvegarder maintenant
+                  </button>
+                </div>
+              )}
+
+              {periodSaveConfirmed && !periodDirty && (
+                <div role="status" className="flex items-start gap-3 px-4 py-3 rounded-xl bg-green-500/10 border-l-4 border-green-500 animate-in slide-in-from-top-2">
+                  <CheckCircle2 size={17} className="text-green-600 shrink-0 mt-0.5" />
+                  <p className="text-sm text-foreground">
+                    <strong>Cycle enregistré.</strong> La période commence le {periodStartDay} de chaque mois et se termine automatiquement le {computeEndDay(parseInt(periodStartDay, 10))} du mois suivant.
                   </p>
                 </div>
               )}
