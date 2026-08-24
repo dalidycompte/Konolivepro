@@ -43,6 +43,7 @@ interface PublicDashboardData {
     accepted: number;
     rejected: number;
     unchanged: number;
+    other: number;
     pending: number;
     processing: number;
   };
@@ -74,6 +75,7 @@ const C = {
   rejected:  '#EF4444',
   pending:   '#F97316',
   unchanged: '#8B5CF6',
+  other:     '#F59E0B',
   processing:'#3B82F6',
 };
 
@@ -110,6 +112,7 @@ export default function PublicSupervisorDashboard() {
         if (fnError) throw fnError;
         
         setData(res as PublicDashboardData);
+        setError(null);
       } catch (err) {
         console.error(err);
         setError('Le lien de tableau de bord est invalide ou expiré.');
@@ -148,13 +151,14 @@ export default function PublicSupervisorDashboard() {
 
   const { kpi, chart } = data;
 
-  const totalProcessed = kpi.accepted + kpi.rejected; // Exclude unchanged
+  const totalProcessed = kpi.accepted + kpi.rejected + kpi.unchanged + kpi.other;
   const processedPercent = Math.min(Math.round((totalProcessed / 10000) * 100), 100);
 
   const donutSlices = [
     { color: C.accepted,  value: kpi.accepted },
     { color: C.rejected,  value: kpi.rejected },
     { color: C.unchanged, value: kpi.unchanged },
+    { color: C.other,     value: kpi.other },
     { color: C.processing,value: kpi.processing },
     { color: C.pending,   value: kpi.pending },
   ];
@@ -178,7 +182,7 @@ export default function PublicSupervisorDashboard() {
       <main className="w-full max-w-5xl px-4 py-8 space-y-8">
         
         {/* KPI Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
           <div className="p-4 sm:p-6 rounded-3xl bg-card border border-border/50 shadow-sm flex items-center gap-4 sm:gap-6 relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-colors" />
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -187,7 +191,7 @@ export default function PublicSupervisorDashboard() {
             <div>
               <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Reçues aujourd'hui</p>
               <h2 className="text-2xl sm:text-3xl font-black text-foreground">{kpi.todayReceived}</h2>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total global: {kpi.totalReceived}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total global : {kpi.totalReceived}</p>
             </div>
           </div>
 
@@ -219,6 +223,18 @@ export default function PublicSupervisorDashboard() {
               <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
                 <span className="text-orange-500 font-medium">{kpi.pending} en attente</span> • <span className="text-blue-500 font-medium">{kpi.processing} en cours</span>
               </p>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-6 rounded-3xl bg-card border border-border/50 shadow-sm flex items-center gap-4 sm:gap-6 relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-500/5 rounded-full blur-xl group-hover:bg-amber-500/10 transition-colors" />
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+              <AlertCircle size={24} className="sm:w-[28px] sm:h-[28px]" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Autres</p>
+              <h2 className="text-2xl sm:text-3xl font-black text-foreground">{kpi.other}</h2>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Demandes clôturées avec statut autre</p>
             </div>
           </div>
         </div>
@@ -267,6 +283,12 @@ export default function PublicSupervisorDashboard() {
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: C.pending }} /> En attente
                 </div>
                 <span className="text-xl font-bold">{kpi.pending}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: C.other }} /> Autres
+                </div>
+                <span className="text-xl font-bold">{kpi.other}</span>
               </div>
             </div>
           </div>
@@ -341,7 +363,7 @@ export default function PublicSupervisorDashboard() {
           <div className="neu-card mt-6">
             <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
               <MapPin size={17} className="text-primary" />
-              Statistiques par localité (Aujourd'hui)
+              Statistiques globales par localité
             </h2>
             <div className="w-full max-w-full overflow-x-auto bg-card rounded-lg border border-slate-100">
               <table className="w-full text-sm text-left">
