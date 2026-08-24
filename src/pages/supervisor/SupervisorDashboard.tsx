@@ -13,11 +13,10 @@ import {
   Users, TrendingUp, Timer, Zap, ChevronDown, ChevronUp,
   Clock, AlertCircle, Loader2, X, Activity,
   AlertTriangle, ArrowRightLeft, Check, MoreHorizontal,
-  MapPin, UserCircle, BarChart2, CalendarDays, Link2, Copy, ExternalLink } from 'lucide-react';
+  MapPin, UserCircle, BarChart2, CalendarDays } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { format, formatDistanceStrict } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { toast } from 'sonner';
 
 
 
@@ -183,8 +182,6 @@ export default function SupervisorDashboard() {
 
   // Performances journalières
   const [dailyPerf, setDailyPerf]         = useState<DailyPerformance[]>([]);
-  const [publicDashboardLink, setPublicDashboardLink] = useState<string | null>(null);
-  const [publicLinkLoading, setPublicLinkLoading] = useState(false);
 
   // Modal "Autre" du jour
   const [showOtherModal, setShowOtherModal]   = useState(false);
@@ -441,39 +438,6 @@ export default function SupervisorDashboard() {
     }
   }
 
-  async function generatePublicDashboardLink() {
-    setPublicLinkLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('create_public_dashboard_link');
-      if (error) throw error;
-      const result = Array.isArray(data) ? data[0] : data;
-      if (!result?.token) throw new Error('Lien public non généré');
-      const link = `${window.location.origin}${window.location.pathname}#/public/dashboard/${result.token}`;
-      setPublicDashboardLink(link);
-      try {
-        await navigator.clipboard?.writeText(link);
-        toast.success('Lien public généré et copié. Il est valable 30 jours.');
-      } catch {
-        toast.success('Lien public généré. Utilisez le bouton Copier ou copiez-le manuellement.');
-      }
-    } catch (error) {
-      console.error('Erreur génération lien public:', error);
-      toast.error("Impossible de générer le lien public. Vérifiez vos droits puis réessayez.");
-    } finally {
-      setPublicLinkLoading(false);
-    }
-  }
-
-  async function copyPublicDashboardLink() {
-    if (!publicDashboardLink) return;
-    try {
-      await navigator.clipboard?.writeText(publicDashboardLink);
-      toast.success('Lien public copié.');
-    } catch {
-      toast.error('Copiez le lien affiché manuellement.');
-    }
-  }
-
   // ── Donut data ────────────────────────────────────────
   const donutData = kpi ? [
     { name: 'Acceptés',   value: kpi.accepted,   color: C.accepted  },
@@ -546,36 +510,6 @@ export default function SupervisorDashboard() {
               <p className="text-xs text-muted-foreground mt-1">Remise à zéro à minuit</p>
             </div>
           </div>
-          </div>
-
-          <div className="neu-card p-4 sm:p-5 border border-primary/15">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              <div className="flex items-start gap-3 flex-1 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                  <Link2 size={19} />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-foreground">Lien public du tableau de bord</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Créez un lien de consultation sans connexion, valable 30 jours. Un nouveau lien remplace le précédent.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={generatePublicDashboardLink}
-                disabled={publicLinkLoading}
-                className="neu-btn-primary py-2.5 shrink-0 disabled:opacity-60"
-              >
-                <Link2 size={16} />
-                {publicLinkLoading ? 'Génération…' : 'Générer le lien public'}
-              </button>
-            </div>
-            {publicDashboardLink && (
-              <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                <input readOnly value={publicDashboardLink} aria-label="Lien public du tableau de bord" className="neu-input min-w-0 flex-1 py-2 text-xs" />
-                <button type="button" onClick={copyPublicDashboardLink} className="neu-btn-secondary py-2 shrink-0"><Copy size={15} />Copier</button>
-                <a href={publicDashboardLink} target="_blank" rel="noreferrer" className="neu-btn-secondary py-2 shrink-0"><ExternalLink size={15} />Ouvrir</a>
-              </div>
-            )}
           </div>
 
         {/* ── Alertes dépassement 7 min ─────────────────── */}
