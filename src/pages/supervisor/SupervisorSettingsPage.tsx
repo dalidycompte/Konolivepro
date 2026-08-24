@@ -75,11 +75,10 @@ export default function SupervisorSettingsPage() {
   // ── Charger les paramètres depuis la DB ──────────────
   const load = useCallback(async () => {
     setLoading(true);
-    const [localData, reasonData, otherData, linkData] = await Promise.all([
+    const [localData, reasonData, otherData] = await Promise.all([
       supabase.from('app_settings').select('value').eq('key', 'disabled_localities').maybeSingle(),
       getRejectionReasons(),
       getOtherReasons(),
-      supabase.from('public_links').select('id').eq('is_active', true).maybeSingle(),
     ]);
     if (localData.data?.value && Array.isArray(localData.data.value)) {
       setDisabledLocalities(localData.data.value as string[]);
@@ -88,11 +87,7 @@ export default function SupervisorSettingsPage() {
     }
     setReasons(reasonData);
     setOtherReasons(otherData);
-    if (linkData.data) {
-      setPublicLinkToken(linkData.data.id);
-    } else {
-      setPublicLinkToken(null);
-    }
+    setPublicLinkToken(null);
     setLoading(false);
     setDirty(false);
     setReasonsDirty(false);
@@ -281,21 +276,32 @@ export default function SupervisorSettingsPage() {
     if (!profile) return;
     setLoadingLink(true);
     try {
-      // Invalidate all existing active links
-      await supabase.from('public_links').update({ is_active: false }).eq('is_active', true);
-
       const { data, error } = await supabase
-        .from('public_links')
-        .insert({ created_by: profile.id, is_active: true })
-        .select('id')
-        .single();
+        .rpc('create_public_dashboard_link');
       
       if (error) throw error;
-      setPublicLinkToken(data.id);
-      toast.success('Lien public généré avec succès.');
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result?.token) throw new Error('Lien public non généré.');
+      setPublicLinkToken(result.token);
+      const url = `${window.location.origin}${window.location.pathname}#/public/dashboard/${result.token}`;
+      try {
+        await navigator.clipboard?.writeText(url);
+        toast.success('Lien public généré et copié. Valable 30 jours.');
+      } catch {
+        toast.success('Lien public généré. Utilisez le bouton Copier.');
+      }
     } catch (err) {
       console.error(err);
-      toast.error('Erreur lors de la génération du lien.');
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('PUBLIC_DASHBOARD_LINK_FORBIDDEN')) {
+        toast.error('Votre compte ne peut pas générer de lien public.');
+      } else if (message.includes('AUTHENTICATION_REQUIRED')) {
+        toast.error('Votre session a expiré. Reconnectez-vous puis réessayez.');
+      } else {
+        toast.error('Erreur lors de la génération du lien.', {
+          description: message || 'Réessayez dans quelques instants.',
+        });
+      }
     } finally {
       setLoadingLink(false);
     }
@@ -303,9 +309,10 @@ export default function SupervisorSettingsPage() {
 
   function copyPublicLink() {
     if (!publicLinkToken) return;
-    const url = `${window.location.origin}/public/dashboard/${publicLinkToken}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Lien copié dans le presse-papiers.');
+    const url = `${window.location.origin}${window.location.pathname}#/public/dashboard/${publicLinkToken}`;
+    navigator.clipboard?.writeText(url)
+      .then(() => toast.success('Lien copié dans le presse-papiers.'))
+      .catch(() => toast.error('Copiez le lien affiché manuellement.'));
   }
 
   const enabledCount  = ALL_LOCALITIES.length - disabledLocalities.length;
@@ -661,7 +668,7 @@ export default function SupervisorSettingsPage() {
             {publicLinkToken ? (
               <>
                 <div className="flex-1 min-w-0 bg-background border border-border/50 rounded-lg px-3 py-2 text-sm text-muted-foreground truncate w-full select-all">
-                  {`${window.location.origin}/public/dashboard/${publicLinkToken}`}
+                  {`${window.location.origin}${window.location.pathname}#/public/dashboard/${publicLinkToken}`}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={copyPublicLink} className="neu-flat p-2 rounded-lg text-primary hover:text-primary/80 transition-colors" title="Copier le lien">
