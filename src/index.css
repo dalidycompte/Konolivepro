@@ -349,9 +349,9 @@
     --neu-text:  #3d4a5c !important;
     --neu-muted: #6e7f95 !important;
 
-    --neu-accent:          #e53935 !important;
-    --neu-accent-gradient: linear-gradient(135deg, #e53935, #c62828) !important;
-    --neu-shadow-primary:  0 4px 16px rgba(229, 57, 53, 0.38) !important;
+    --neu-accent:          var(--konolive-primary-hex, #e53935) !important;
+    --neu-accent-gradient: var(--konolive-primary-gradient, linear-gradient(135deg, #e53935, #c62828)) !important;
+    --neu-shadow-primary:  var(--konolive-primary-shadow, 0 4px 16px rgba(229, 57, 53, 0.38)) !important;
 
     --neu-shadow-raised: 6px 6px 14px #a3b1c6, -6px -6px 14px #ffffff !important;
     --neu-shadow-flat:   3px 3px 7px #a3b1c6,  -3px -3px 7px #ffffff !important;
@@ -363,12 +363,12 @@
     --card:               213 20% 87% !important;
     --muted-foreground:   213 16% 52% !important;
     --border:             213 18% 78% !important;
-    --ring:               0 73% 55% !important;
-    --primary:            0 73% 55% !important;
-    --primary-foreground: 0 0% 100% !important;
+    --ring:               var(--konolive-primary-hsl, 0 73% 55%) !important;
+    --primary:            var(--konolive-primary-hsl, 0 73% 55%) !important;
+    --primary-foreground: var(--konolive-primary-foreground, 0 0% 100%) !important;
 
-    --gradient-primary: linear-gradient(135deg, #e53935, #c62828) !important;
-    --shadow-primary: 0 4px 16px rgba(229, 57, 53, 0.38) !important;
+    --gradient-primary: var(--konolive-primary-gradient, linear-gradient(135deg, #e53935, #c62828)) !important;
+    --shadow-primary: var(--konolive-primary-shadow, 0 4px 16px rgba(229, 57, 53, 0.38)) !important;
   }
 }
 
@@ -436,6 +436,7 @@
            disabled:pointer-events-none disabled:opacity-50;
     background: var(--gradient-primary);
     box-shadow: var(--neu-shadow-btn), var(--neu-shadow-primary);
+    color: hsl(var(--primary-foreground));
   }
   .neu-btn-primary:hover  { filter: brightness(1.08); transform: translateY(-1px); }
   .neu-btn-primary:active {
@@ -502,6 +503,7 @@
   .avatar-initials {
     @apply flex items-center justify-center rounded-full font-semibold text-white text-sm;
     background: var(--gradient-primary);
+    color: hsl(var(--primary-foreground));
   }
 }
 
@@ -513,4 +515,3 @@
   .neu-card, .kpi-card, .stat-card { will-change: auto; }
   .neu-btn-primary, .neu-btn-secondary { will-change: auto; }
 }
-

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
-import { Settings, Info, Video, Shield, Bell, Smartphone, Upload, CheckCircle2, Trash2, ExternalLink, AlertTriangle, UserCircle } from 'lucide-react';
+import { Settings, Info, Video, Shield, Bell, Smartphone, Upload, CheckCircle2, Trash2, ExternalLink, AlertTriangle, UserCircle, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadApk, getApkUrl, deleteApk } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,6 +20,8 @@ import {
 
 export default function AdminConfigPage() {
   const { user } = useAuth();
+  const { primaryColor, setPrimaryColor } = useTheme();
+  const [draftPrimaryColor, setDraftPrimaryColor] = useState(primaryColor);
   const [settings, setSettings] = useState({
     app_name: 'Konolive',
     max_requests_per_day: '100',
@@ -44,6 +47,29 @@ export default function AdminConfigPage() {
     }
     loadGenericSettings();
   }, []);
+
+  useEffect(() => {
+    setDraftPrimaryColor(primaryColor);
+  }, [primaryColor]);
+
+  async function handlePrimaryColorSave() {
+    const color = draftPrimaryColor.trim().toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(color)) {
+      toast.error('Utilisez une couleur au format #RRGGBB, par exemple #E53935.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({ key: 'site_primary_color', value: { hex: color }, updated_by: user?.id });
+    if (error) {
+      toast.error("La couleur n'a pas pu être enregistrée.");
+      return;
+    }
+
+    setPrimaryColor(color);
+    toast.success('Couleur principale mise à jour pour toute la plateforme.');
+  }
 
   async function handleGenericSave() {
     try {
@@ -145,6 +171,41 @@ export default function AdminConfigPage() {
                 <input className="neu-input" type="number" min="1" value={settings.max_requests_per_day} onChange={e => setSettings(s => ({ ...s, max_requests_per_day: e.target.value }))} />
               </div>
             </div>
+          </div>
+
+          {/* Identité visuelle */}
+          <div className="neu-card">
+            <h2 className="font-semibold text-foreground mb-2 flex items-center gap-2"><Palette size={18} className="text-primary" />Identité visuelle</h2>
+            <p className="text-sm text-muted-foreground mb-5">Choisissez la couleur principale utilisée pour les boutons, liens, accents et focus du site.</p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <label className="block">
+                <span className="block text-sm font-normal text-foreground mb-2">Couleur principale</span>
+                <span className="flex items-center gap-3">
+                  <input
+                    aria-label="Choisir la couleur principale"
+                    type="color"
+                    value={/^#[0-9A-Fa-f]{6}$/.test(draftPrimaryColor) ? draftPrimaryColor : primaryColor}
+                    onChange={e => setDraftPrimaryColor(e.target.value.toUpperCase())}
+                    className="h-11 w-14 rounded-xl cursor-pointer border border-border bg-transparent p-1"
+                  />
+                  <input
+                    className="neu-input w-36 uppercase"
+                    value={draftPrimaryColor}
+                    maxLength={7}
+                    onChange={e => setDraftPrimaryColor(e.target.value.toUpperCase())}
+                    aria-label="Code hexadécimal de la couleur principale"
+                    placeholder="#E53935"
+                  />
+                </span>
+              </label>
+              <div className="flex-1 min-w-0 rounded-xl p-3 text-sm font-medium" style={{ background: /^#[0-9A-Fa-f]{6}$/.test(draftPrimaryColor) ? draftPrimaryColor : primaryColor, color: '#FFFFFF' }}>
+                Aperçu des accents
+              </div>
+              <button type="button" onClick={handlePrimaryColorSave} className="neu-btn-primary py-3 shrink-0">
+                Enregistrer la couleur
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Conseil : choisissez une teinte suffisamment contrastée pour que les libellés restent lisibles.</p>
           </div>
 
           {/* Appel Générique */}
@@ -379,4 +440,3 @@ export default function AdminConfigPage() {
     </MainLayout>
   );
 }
-
