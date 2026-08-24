@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { createRequest, upsertDocuments, uploadFile, checkPhoneInProgress } from '@/lib/api';
+import { createRequest, upsertDocuments, uploadFile } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { CheckCircle2, Phone, CreditCard, ScanFace, ShieldAlert } from 'lucide-react';
@@ -48,13 +48,13 @@ export default function NewRequestPage() {
 
     setSubmitting(true);
     try {
-      const inProgress = await checkPhoneInProgress(phone.trim());
-      if (inProgress) {
-        throw new Error("Une demande est déjà en cours de traitement pour ce numéro.");
+      const { data: reqData, error: reqErr } = await createRequest({ phone_to_certify: phone.trim() });
+      if (reqErr || !reqData) {
+        if (reqErr?.message?.includes('ACTIVE_DUPLICATE_PHONE')) {
+          throw new Error('Ce numéro a déjà une demande en cours. Attendez la clôture du traitement avant de le soumettre à nouveau.');
+        }
+        throw new Error(reqErr?.message ?? 'Impossible de créer la demande');
       }
-
-      const { data: reqData, error: reqErr } = await createRequest({ applicant_id: profile.id, phone_to_certify: phone.trim() });
-      if (reqErr || !reqData) throw new Error(reqErr?.message ?? 'Impossible de créer la demande');
       const requestId = (reqData as { id: string }).id;
       const uid = profile.id;
 
@@ -200,4 +200,3 @@ export default function NewRequestPage() {
     </MainLayout>
   );
 }
-

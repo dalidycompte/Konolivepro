@@ -233,8 +233,10 @@ export async function checkPhoneInProgress(phone: string): Promise<boolean> {
   return !!data;
 }
 
-export async function createRequest(payload: { applicant_id: string; phone_to_certify: string }) {
-  return supabase.from('verification_requests').insert(payload).select().maybeSingle();
+export async function createRequest(payload: { phone_to_certify: string }) {
+  return supabase
+    .rpc('create_mobile_verification_request', { p_phone: payload.phone_to_certify })
+    .single();
 }
 
 export async function updateRequestStatus(
