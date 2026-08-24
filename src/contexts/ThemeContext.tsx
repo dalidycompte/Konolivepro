@@ -161,7 +161,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     loadPrimaryColor();
-    return () => { mounted = false; };
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void loadPrimaryColor();
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   return (
