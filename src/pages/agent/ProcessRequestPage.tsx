@@ -155,6 +155,28 @@ export default function ProcessRequestPage() {
     { key: 'raison_du_retard',      label: 'RAISON RETARD' },
   ];
 
+  // Le tableau doit rester compact sur ordinateur pour rendre toutes les colonnes
+  // visibles à l'ouverture. Sur mobile, ses largeurs habituelles sont conservées
+  // et le défilement horizontal reste disponible.
+  const processingTableColumns = [
+    { key: 'numero',                  desktopWidth: '6%' },
+    ...(!hiddenColumns.includes('date') ? [{ key: 'date', desktopWidth: '8%' }] : []),
+    ...(!hiddenColumns.includes('coach') ? [{ key: 'coach', desktopWidth: '8%' }] : []),
+    { key: 'constat_webcare',         desktopWidth: '9%' },
+    { key: 'type_de_piece',           desktopWidth: '6%' },
+    { key: 'verbatim',                desktopWidth: '8%' },
+    { key: 'action_prise_gsm',        desktopWidth: '9%' },
+    { key: 'statut_final_gsm',        desktopWidth: '8%' },
+    { key: 'traitement',              desktopWidth: '7%' },
+    { key: 'type_d_identification',   desktopWidth: '10%' },
+    { key: 'raison_du_retard',        desktopWidth: '7%' },
+    { key: 'capture',                 desktopWidth: '9%' },
+    { key: 'actions',                 desktopWidth: '5%' },
+  ];
+  const gsmColumnSpan = 1 + (hiddenColumns.includes('date') ? 0 : 1);
+  const coachColumnSpan = hiddenColumns.includes('coach') ? 0 : 1;
+  const identificationColumnSpan = processingTableColumns.length - gsmColumnSpan - coachColumnSpan;
+
   // ── Filtered history rows (apply active col filters)
   const filteredDetails = useMemo(() => {
     return recentDetails.filter(hist => {
@@ -1244,31 +1266,58 @@ export default function ProcessRequestPage() {
             </div>
             {/* ── Zone tableau — fond blanc, défilement vertical ── */}
             <div className="flex-1 min-h-0 p-1 overflow-hidden flex flex-col">
+              <style>{`
+                @media (min-width: 1024px) {
+                  .processing-details-table {
+                    width: 100% !important;
+                    min-width: 0 !important;
+                    table-layout: fixed;
+                  }
+                  .processing-details-table th,
+                  .processing-details-table td {
+                    min-width: 0 !important;
+                  }
+                  .processing-details-table col {
+                    width: var(--desktop-column-width) !important;
+                  }
+                  .processing-details-table th {
+                    white-space: normal !important;
+                    overflow-wrap: anywhere;
+                  }
+                }
+              `}</style>
               <div style={{ backgroundColor: '#ffffff' }} className="w-full h-full overflow-auto rounded-sm border border-[#3d2010]">
-                <Table className="[&>div]:max-w-full relative text-xs" style={{ fontFamily: tableFont, fontSize: tableFontSize }}>
+                <Table className="processing-details-table min-w-[1580px] lg:min-w-0 relative text-xs" style={{ fontFamily: tableFont, fontSize: tableFontSize }}>
+                  <colgroup>
+                    {processingTableColumns.map(({ key, desktopWidth }) => (
+                      <col key={key} style={{ '--desktop-column-width': desktopWidth } as React.CSSProperties} />
+                    ))}
+                  </colgroup>
                   <TableHeader className="sticky top-0 z-10 text-[11px] leading-tight">
                     {/* ── Bandeau supérieur jaune/orange — style Excel FICHIER GSM ── */}
                     <TableRow style={{ backgroundColor: '#FFC000' }} className="hover:bg-[#FFC000] border-b border-[#e6a800]">
                       <TableHead
-                        colSpan={2}
+                        colSpan={gsmColumnSpan}
                         style={{ color: '#000', backgroundColor: '#FFC000' }}
                         className="px-2 h-7 font-black whitespace-nowrap border-r border-[#e6a800] text-[11px]"
                       >
                         GSM
                       </TableHead>
+                      {coachColumnSpan > 0 && (
+                        <TableHead
+                          colSpan={coachColumnSpan}
+                          style={{ color: '#000', backgroundColor: '#FFC000' }}
+                          className="px-2 h-7 font-semibold whitespace-nowrap border-r border-[#e6a800] text-[11px]"
+                        >
+                          Date de traitement :{' '}
+                          {new Date().toLocaleDateString('fr-FR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            timeZone: 'Africa/Brazzaville',
+                          })}
+                        </TableHead>
+                      )}
                       <TableHead
-                        colSpan={1}
-                        style={{ color: '#000', backgroundColor: '#FFC000' }}
-                        className="px-2 h-7 font-semibold whitespace-nowrap border-r border-[#e6a800] text-[11px]"
-                      >
-                        Date de traitement :{' '}
-                        {new Date().toLocaleDateString('fr-FR', {
-                          day: '2-digit', month: '2-digit', year: 'numeric',
-                          timeZone: 'Africa/Brazzaville',
-                        })}
-                      </TableHead>
-                      <TableHead
-                        colSpan={8}
+                        colSpan={identificationColumnSpan}
                         style={{ color: '#000', backgroundColor: '#FFC000' }}
                         className="px-2 h-7 font-black text-center whitespace-nowrap text-[12px] tracking-wide"
                       >
@@ -1491,7 +1540,7 @@ export default function ProcessRequestPage() {
                     {/* Historique des traitements en dessous */}
                     {recentDetails.length > 0 && (
                       <TableRow style={{ backgroundColor: '#FFF9E6' }}>
-                        <TableCell colSpan={14} className="py-1 px-2 text-[10px] font-semibold text-[#4472C4] uppercase tracking-wider text-center border-r border-black bg-[#FFC000]/20">
+                        <TableCell colSpan={processingTableColumns.length} className="py-1 px-2 text-[10px] font-semibold text-[#4472C4] uppercase tracking-wider text-center border-r border-black bg-[#FFC000]/20">
                           Historique du jour — {filteredDetails.length}/{recentDetails.length} traitement{recentDetails.length > 1 ? 's' : ''}
                           {Object.values(colFilters).some(s => s.size > 0) && (
                             <button onClick={() => setColFilters({})} className="ml-2 text-[9px] bg-orange-100 text-orange-700 border border-orange-300 rounded px-1.5 py-0.5 hover:bg-orange-200">✕ Effacer filtres</button>
