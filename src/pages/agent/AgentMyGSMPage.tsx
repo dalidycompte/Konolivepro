@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   getAllRequests, getAgentProcessingDetailsByDate,
   getAgentDailyTreatmentCounts, saveProcessingDetails, getProcessingOptions,
+  deleteProcessingDetails,
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import type { ProcessingDetails, ProcessingOption } from '@/types/index';
@@ -16,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Smartphone, Search, ClipboardList, ChevronLeft, ChevronRight,
   Image as ImageIcon, Pencil, X, Check, Filter, SlidersHorizontal, CalendarDays,
+  Trash2,
 } from 'lucide-react';
 import {
   format, parseISO, isToday, isSameDay, isSameMonth,
@@ -35,6 +37,8 @@ const DETAIL_COLS: Array<{ key: keyof ProcessingDetails; label: string; w: strin
   { key: 'type_d_identification', label: 'TYPE ID',         w: '110px' },
   { key: 'raison_du_retard',      label: 'RAISON RETARD',   w: '90px'  },
 ];
+
+const DESKTOP_TABLE_WIDTHS = ['3%', '7%', '7%', '8%', '8%', '5%', '8%', '8%', '7%', '7%', '8%', '6%', '10%', '8%'];
 
 // ── Utilitaires ───────────────────────────────────────────────────────────────
 function fmtDate(raw?: string | null, withTime = true) {
@@ -250,6 +254,7 @@ export default function AgentMyGSMPage() {
   const [lightbox, setLightbox]       = useState<string | null>(null);
   const [fontFamily, setFontFamily]   = useState(TABLE_FONT_DEFAULT);
   const [fontSize, setFontSize]       = useState(TABLE_SIZE_DEFAULT);
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadForRef = useRef<string | null>(null);
@@ -343,6 +348,31 @@ export default function AgentMyGSMPage() {
       setDayDetails(prev => prev.map(d => d.request_id === reqId ? { ...d, [col]: newVal } : d));
       toast.success('Cellule mise à jour');
     } catch { toast.error('Erreur de mise à jour'); }
+  };
+
+  const handleDeleteRow = async (detail: any) => {
+    if (!profile || !detail.request_id || deletingRequestId) return;
+    const phone = detail.request?.phone_to_certify ? `+${detail.request.phone_to_certify}` : 'ce numéro';
+    const confirmed = window.confirm(
+      `Supprimer définitivement les détails de traitement et les captures de ${phone} ?\n\nCette action ne peut pas être annulée. La demande elle-même est conservée.`
+    );
+    if (!confirmed) return;
+
+    setDeletingRequestId(detail.request_id);
+    try {
+      await deleteProcessingDetails(detail.request_id, detail.screenshot_urls ?? []);
+      setDayDetails(prev => prev.filter(row => row.request_id !== detail.request_id));
+      setDayCounts(prev => ({
+        ...prev,
+        [selKey]: Math.max(0, (prev[selKey] ?? 1) - 1),
+      }));
+      toast.success('Ligne de traitement supprimée.');
+    } catch (error) {
+      console.error('Processing row deletion failed', error);
+      toast.error('Impossible de supprimer cette ligne.');
+    } finally {
+      setDeletingRequestId(null);
+    }
   };
 
   // ── Upload capture ─────────────────────────────────────────────────────────
@@ -482,13 +512,41 @@ export default function AgentMyGSMPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table style={{ borderCollapse: 'collapse', minWidth: 1050, fontSize, fontFamily, width: '100%' }}>
+                <style>{`
+                  @media (min-width: 1024px) {
+                    .my-gsm-table {
+                      width: 100% !important;
+                      min-width: 0 !important;
+                      table-layout: fixed;
+                    }
+                    .my-gsm-table th,
+                    .my-gsm-table td {
+                      min-width: 0 !important;
+                      max-width: none !important;
+                    }
+                    .my-gsm-table th {
+                      white-space: normal !important;
+                      overflow-wrap: anywhere;
+                      line-height: 1.1;
+                    }
+                    .my-gsm-table col {
+                      width: var(--desktop-column-width) !important;
+                    }
+                  }
+                `}</style>
+                <table className="my-gsm-table" style={{ borderCollapse: 'collapse', minWidth: 1180, fontSize, fontFamily, width: '100%' }}>
+                  <colgroup>
+                    {DESKTOP_TABLE_WIDTHS.map((width, index) => (
+                      <col key={index} style={{ '--desktop-column-width': width } as React.CSSProperties} />
+                    ))}
+                  </colgroup>
                   <thead>
                     <tr>
                       <th colSpan={3} style={{ backgroundColor: '#FFC000', color: '#000', fontWeight: 700, padding: '3px 6px', textAlign: 'center', border: '1px solid #000' }}>GSM</th>
                       <th style={{ backgroundColor: '#FFC000', color: '#000', fontWeight: 700, padding: '3px 6px', textAlign: 'center', border: '1px solid #000' }}>DATE</th>
                       <th colSpan={DETAIL_COLS.length} style={{ backgroundColor: '#FFC000', color: '#000', fontWeight: 700, padding: '3px 6px', textAlign: 'center', border: '1px solid #000' }}>CENTRE D'IDENTIFICATION</th>
                       <th style={{ backgroundColor: '#FFC000', color: '#000', fontWeight: 700, padding: '3px 6px', textAlign: 'center', border: '1px solid #000' }}>CAPTURES</th>
+                      <th style={{ backgroundColor: '#FFC000', color: '#000', fontWeight: 700, padding: '3px 6px', textAlign: 'center', border: '1px solid #000' }}>ACTION</th>
                     </tr>
                     <tr>
                       <th style={{ backgroundColor: '#4472C4', color: '#fff', fontWeight: 700, padding: '3px 5px', border: '1px solid #000', width: 32, textAlign: 'center' }}>#</th>
@@ -509,6 +567,9 @@ export default function AgentMyGSMPage() {
                       ))}
                       <th style={{ backgroundColor: '#4472C4', color: '#fff', fontWeight: 700, padding: '3px 5px', border: '1px solid #000', minWidth: 90, textAlign: 'center' }}>
                         <div className="flex items-center justify-center gap-1"><ImageIcon size={11} />CAPTURES</div>
+                      </th>
+                      <th style={{ backgroundColor: '#4472C4', color: '#fff', fontWeight: 700, padding: '3px 5px', border: '1px solid #000', minWidth: 72, textAlign: 'center' }}>
+                        <div className="flex items-center justify-center gap-1"><Trash2 size={11} />SUPPR.</div>
                       </th>
                     </tr>
                   </thead>
@@ -548,6 +609,20 @@ export default function AgentMyGSMPage() {
                                 <ImageIcon size={12} className="text-gray-500" />
                               </button>
                             </div>
+                          </td>
+                          <td style={{ border: '1px solid #000', padding: '2px 5px', textAlign: 'center', minWidth: 72 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRow(d)}
+                              disabled={deletingRequestId !== null}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded border border-red-300 bg-red-50 text-red-600 transition-colors hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Supprimer cette ligne de traitement"
+                              aria-label="Supprimer cette ligne de traitement"
+                            >
+                              {deletingRequestId === d.request_id
+                                ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                : <Trash2 size={14} />}
+                            </button>
                           </td>
                         </tr>
                       );

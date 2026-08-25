@@ -962,6 +962,32 @@ export async function getProcessingDetails(request_id: string) {
   return data as ProcessingDetails | null;
 }
 
+export async function deleteProcessingDetails(request_id: string, screenshotUrls: string[] = []) {
+  // Les URLs sont enregistrées par Supabase Storage. La suppression du fichier est
+  // volontairement tentée avant la ligne SQL, mais une capture déjà absente ne doit
+  // pas empêcher l’agent de corriger sa ligne de traitement.
+  const storagePrefix = '/storage/v1/object/public/processing-screenshots/';
+  const screenshotPaths = screenshotUrls
+    .map((url) => {
+      const position = url.indexOf(storagePrefix);
+      return position >= 0 ? decodeURIComponent(url.slice(position + storagePrefix.length)) : null;
+    })
+    .filter((path): path is string => Boolean(path));
+
+  if (screenshotPaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from('processing-screenshots')
+      .remove(screenshotPaths);
+    if (storageError) console.warn('Unable to remove one or more processing screenshots', storageError);
+  }
+
+  const { error } = await supabase
+    .from('processing_details')
+    .delete()
+    .eq('request_id', request_id);
+  if (error) throw error;
+}
+
 export async function getAgentRecentProcessingDetails(agent_id: string, limit: number = 50) {
   // Filtre uniquement les enregistrements créés aujourd'hui (fuseau Africa/Brazzaville = UTC+1)
   const now = new Date();
