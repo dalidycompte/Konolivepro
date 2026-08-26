@@ -38,9 +38,9 @@ object CallNotifications {
     fun showIncoming(context: Context, call: IncomingCall) {
         createChannels(context)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        val intent = Intent(context, IncomingCallActivity::class.java).apply {
+        val intent = Intent(context, MainActivity::class.java).apply {
             putExtra(EXTRA_CALL_JSON, call.toJson().toString())
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val fullScreen = PendingIntent.getActivity(context, call.callId.hashCode(), intent, flags)
         val person = Person.Builder().setName(call.callerName).setImportant(true).build()

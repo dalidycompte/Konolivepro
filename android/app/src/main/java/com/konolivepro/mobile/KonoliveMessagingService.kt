@@ -12,8 +12,7 @@ class KonoliveMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         val store = SessionStore(this)
         store.accessToken ?: return
-        // MainActivity registers the token through the authenticated Supabase RPC.
-        // A token refresh is intentionally not sent with an unauthenticated request.
+        sendBroadcast(Intent(ACTION_FCM_TOKEN).setPackage(packageName).putExtra(FCM_TOKEN, token))
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -40,6 +39,7 @@ class KonoliveMessagingService : FirebaseMessagingService() {
         getSharedPreferences("konolive_pending_call", MODE_PRIVATE)
             .edit().putString("call", call.toJson().toString()).apply()
         CallNotifications.showIncoming(this, call)
+        sendBroadcast(Intent(ACTION_INCOMING_CALL).setPackage(packageName).putExtra(CALL_JSON, call.toJson().toString()))
     }
 
     private fun handleCallState(data: Map<String, String>) {

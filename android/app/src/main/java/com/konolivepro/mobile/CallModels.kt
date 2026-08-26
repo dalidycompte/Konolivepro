@@ -14,6 +14,10 @@ const val CALL_TYPE = "callType"
 const val TIMESTAMP = "timestamp"
 const val EXPIRES_AT = "expiresAt"
 const val CALL_STATE = "state"
+const val CALL_JSON = "call_json"
+const val FCM_TOKEN = "fcm_token"
+const val ACTION_INCOMING_CALL = "com.konolivepro.mobile.INCOMING_CALL"
+const val ACTION_FCM_TOKEN = "com.konolivepro.mobile.FCM_TOKEN"
 
 private const val PREFS = "konolive_session"
 
