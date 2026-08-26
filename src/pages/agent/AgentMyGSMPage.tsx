@@ -68,17 +68,45 @@ function ColFilter({ col, label, rows, colFilters, setColFilters }: ColFilterPro
     return Array.from(s).sort();
   }, [rows, col]);
   const active = colFilters[col];
-  const hasFilter = active !== undefined;
-  const toggle = (val: string) => setColFilters(prev => {
-    const cur = new Set(prev[col] ?? []);
-    if (cur.has(val)) cur.delete(val); else cur.add(val);
-    return { ...prev, [col]: cur };
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [draft, setDraft] = useState<Set<string>>(() => new Set(vals));
+  const visibleVals = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return query ? vals.filter(value => value.toLowerCase().includes(query)) : vals;
+  }, [vals, search]);
+  const hasFilter = active !== undefined && active.size < vals.length;
+  const allVisibleSelected = visibleVals.length > 0 && visibleVals.every(value => draft.has(value));
+  const toggle = (val: string) => setDraft(prev => {
+    const next = new Set(prev);
+    if (next.has(val)) next.delete(val); else next.add(val);
+    return next;
   });
-  const clear = () => setColFilters(prev => { const n = { ...prev }; delete n[col]; return n; });
-  const selectAll = () => setColFilters(prev => ({ ...prev, [col]: new Set(vals) }));
-  const selectNone = () => setColFilters(prev => ({ ...prev, [col]: new Set() }));
+  const toggleVisible = () => setDraft(prev => {
+    const next = new Set(prev);
+    if (allVisibleSelected) visibleVals.forEach(value => next.delete(value));
+    else visibleVals.forEach(value => next.add(value));
+    return next;
+  });
+  const selectAll = () => setDraft(new Set(vals));
+  const selectNone = () => setDraft(new Set());
+  const apply = () => {
+    setColFilters(prev => ({ ...prev, [col]: new Set(draft) }));
+    setOpen(false);
+  };
+  const clear = () => {
+    setColFilters(prev => { const next = { ...prev }; delete next[col]; return next; });
+    setOpen(false);
+  };
+  const cancel = () => setOpen(false);
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={nextOpen => {
+      setOpen(nextOpen);
+      if (nextOpen) {
+        setSearch('');
+        setDraft(new Set(active ?? vals));
+      }
+    }}>
       <PopoverTrigger asChild>
         <button title={`Filtrer ${label}`}
           className={`shrink-0 h-4 w-4 flex items-center justify-center rounded transition-colors
@@ -86,32 +114,43 @@ function ColFilter({ col, label, rows, colFilters, setColFilters }: ColFilterPro
           <Filter size={9} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[180px] p-0 z-[9999]" align="start" side="bottom" avoidCollisions>
-        <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b bg-muted/30">
-          <span className="text-[10px] font-bold uppercase text-muted-foreground">{label}</span>
-          <div className="flex items-center gap-1.5 text-[9px] font-medium">
-            <button onClick={selectAll} className="text-primary hover:underline">Tout</button>
-            <span className="text-muted-foreground">|</span>
-            <button onClick={selectNone} className="text-destructive hover:underline">Aucun</button>
-            {hasFilter && <>
-              <span className="text-muted-foreground">|</span>
-              <button onClick={clear} className="text-orange-600 hover:underline">Effacer</button>
-            </>}
+      <PopoverContent className="w-[245px] p-0 z-[9999]" align="start" side="bottom" avoidCollisions>
+        <div className="px-3 py-2 border-b bg-muted/30">
+          <p className="text-[10px] font-bold uppercase text-muted-foreground">Filtrer : {label}</p>
+          <div className="relative mt-2">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Rechercher"
+              className="h-7 w-full rounded border border-border bg-background pl-6 pr-2 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
         </div>
-        <ScrollArea className="h-[150px]">
-          <div className="p-1">
-            {vals.map(val => {
-              const checked = !active || active.has(val);
+        <div className="flex items-center gap-2 px-3 py-2 border-b text-[10px]">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleVisible} className="h-3.5 w-3.5 accent-primary" />
+            <span>(Sélectionner tout)</span>
+          </label>
+          <button onClick={selectAll} className="ml-auto text-primary hover:underline">Tout</button>
+          <button onClick={selectNone} className="text-destructive hover:underline">Aucun</button>
+        </div>
+        <ScrollArea className="h-[175px]">
+          <div className="p-1.5">
+            {visibleVals.length === 0 ? (
+              <p className="px-2 py-3 text-center text-[11px] text-muted-foreground">Aucune valeur trouvée</p>
+            ) : visibleVals.map(val => {
+              const checked = draft.has(val);
               return (
-                <label key={val} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
-                  <input type="checkbox" checked={checked} onChange={() => toggle(val)} className="h-3 w-3 accent-blue-600" />
-                  <span className="text-xs truncate flex-1">{val || <span className="italic text-muted-foreground">(vide)</span>}</span>
+                <label key={val || '__empty__'} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer">
+                  <input type="checkbox" checked={checked} onChange={() => toggle(val)} className="h-3.5 w-3.5 accent-primary" />
+                  <span className="text-[11px] truncate flex-1">{val || <span className="italic text-muted-foreground">(Vides)</span>}</span>
                 </label>
               );
             })}
           </div>
         </ScrollArea>
+        <div className="flex items-center justify-end gap-2 border-t px-3 py-2 bg-muted/20">
+          {hasFilter && <button onClick={clear} className="mr-auto text-[11px] text-orange-600 hover:underline">Effacer le filtre</button>}
+          <button onClick={cancel} className="rounded px-2.5 py-1 text-[11px] hover:bg-accent">Annuler</button>
+          <button onClick={apply} className="rounded bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground hover:bg-primary/90">Appliquer</button>
+        </div>
       </PopoverContent>
     </Popover>
   );
