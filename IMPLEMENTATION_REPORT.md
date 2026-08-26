@@ -1,46 +1,32 @@
 # Rapport d’implémentation Konolivepro
 
-## Résultat
+## Application du site réel
 
-L’APK Android Konolivepro est un **conteneur natif du site web réel**. Au lancement, l’application ouvre `https://dalidycompte.github.io/Konolivepro/` dans une WebView Android sécurisée. Les utilisateurs retrouvent donc le site, ses routes HashRouter, son authentification Supabase, ses écrans métier et son identité visuelle directement dans l’application, sans passer par le navigateur externe.
+L’APK Konolivepro ouvre le site web réel `https://dalidycompte.github.io/Konolivepro/` dans une WebView native. Les utilisateurs utilisent les mêmes pages, routes HashRouter, formulaire de connexion, tableaux de bord et fonctions métier que sur le site, sans être redirigés vers un navigateur externe.
 
-L’application native fournit la couche Android autour du site : navigation interne avec le bouton Retour, conservation du stockage local et de la session, liens du site ouverts dans l’application, liens externes sécurisés dans le navigateur, sélection de fichiers, capture caméra, accès microphone pour WebRTC, notifications FCM et appels entrants plein écran.
+## Appel entrant lorsque l’application est fermée
 
-## Fonctionnalités prises en charge
+Le comportement demandé est implémenté. Lorsqu’un message FCM haute priorité arrive alors que l’application est en arrière-plan ou fermée normalement, le service Android reçoit l’invitation, lance une notification d’appel de priorité élevée et ouvre `IncomingCallActivity` en plein écran. Cette page affiche le nom de l’appelant, sa photo si elle est accessible, le compte à rebours, les boutons `Refuser` et `Accepter`, la sonnerie configurée sur le téléphone et un schéma de vibration répétée.
 
-| Fonction du site | Prise en charge Android |
-|---|---|
-| Navigation `#/login`, `#/dashboard`, `#/dashboard/new-request` et autres routes | Oui, la WebView conserve la navigation HashRouter du site. |
-| Authentification et session Supabase | Oui, DOM Storage et stockage local sont activés. |
-| Upload des documents et selfie | Oui, le sélecteur de fichiers Android accepte plusieurs images. |
-| Capture caméra et microphone | Oui, les permissions Android sont demandées lorsque le site les utilise. |
-| Appels WebRTC du site | Oui, les demandes média du domaine Konolive sont autorisées. |
-| Notifications d’appel en arrière-plan | Oui, FCM data-only réveille le service Android. |
-| Ouverture d’une notification d’appel | Oui, elle ouvre l’application sur le site et transmet l’événement d’appel à la WebView. |
-| Bouton Retour Android | Retourne dans l’historique WebView avant de fermer l’application. |
-| Liens externes et `mailto:`/`tel:` | Ouvrent le navigateur ou l’application système correspondante. |
+La page d’appel utilise le mode d’usage système `USAGE_NOTIFICATION_RINGTONE` pour respecter la sonnerie du téléphone. Elle demande uniquement les autorisations Android nécessaires : notifications, vibration, réveil de l’écran, caméra et microphone. L’acceptation passe par l’état atomique Supabase puis ouvre l’appel WebRTC. Le refus et l’expiration arrêtent immédiatement la sonnerie, la vibration et la notification. Un événement de fin reçu d’un autre appareil ferme aussi l’écran et arrête l’alerte.
 
-## Configuration Firebase
+Lorsque l’utilisateur touche le contenu de la notification plutôt qu’un bouton direct, l’application ouvre le site dans la WebView et transmet l’événement d’appel à la page web. Les boutons d’action `Accepter` et `Refuser` de la notification restent reliés à l’écran d’appel natif pour permettre une réponse rapide depuis l’écran verrouillé.
 
-Le fichier Firebase officiel fourni a été utilisé localement pour produire l’APK. Il correspond au projet `konolivepro` et au package Android `com.dalidycompte.konolive`. Le fichier `google-services.json` est ignoré par Git et n’est pas publié dans le dépôt.
+## Conditions Android importantes
 
-## Vérifications réalisées
+Le comportement fonctionne lorsque l’application est en arrière-plan ou fermée par l’utilisateur, à condition que les notifications, l’affichage plein écran et la batterie ne soient pas bloqués par le système. Les appareils Samsung, Xiaomi, Tecno, Infinix et certains autres fabricants peuvent suspendre les notifications en raison de leurs réglages d’économie d’énergie; l’écran Paramètres de l’application contient un accès à la configuration de la batterie.
 
-Le build de production du site web a réussi avec `npm run build`. La configuration Gradle Android a réussi avec `./gradlew help`. L’APK WebView actuel a été compilé avec `./gradlew clean assembleDebug`, puis vérifié avec `apksigner` et `aapt`.
+Android ne permet pas à une application de contourner un arrêt forcé explicite par l’utilisateur, le mode Ne pas déranger ou la désactivation manuelle des notifications. Ces limites sont également applicables aux applications de type WhatsApp.
+
+## Vérifications
+
+Le build Android `assembleDebug` a réussi avec le fichier Firebase officiel fourni. L’APK est signé avec la clé debug et vérifié avec `apksigner`. Le test de réception FCM sur un appareil physique doit encore être réalisé avec le backend `send-call-push` déployé et son secret FCM configuré.
 
 | Élément | Valeur |
 |---|---|
 | APK | `android/app/build/outputs/apk/debug/app-debug.apk` |
-| Package | `com.dalidycompte.konolive` |
-| Taille | Environ 49 Mo |
+| Package Firebase | `com.dalidycompte.konolive` |
 | Compatibilité déclarée | Android 8.0 ou supérieur, SDK 26 à 35 |
-| SHA-256 de l’APK Firebase | `3205a5659035fb31e00de5e3283538cbdb5f05d7f5572fb2a9d9eaf271c41b16` |
-| Dernier commit publié | À mettre à jour après publication du package Firebase |
-
-## Backend et synchronisation
-
-La migration `supabase/migrations/00029_native_android_call_reliability.sql` ajoute le registre des appareils, les transitions atomiques et les états `RINGING`, `ACCEPTED`, `CONNECTED`, `REJECTED`, `EXPIRED` et `ENDED`. La fonction `supabase/functions/send-call-push` envoie les événements aux appareils Android du Coach Mobile. Le site crée l’état `RINGING` avant de publier l’invitation et ferme les appels sur les autres appareils lorsqu’un état final est reçu.
-
-## Mise en production
-
-L’APK joint ouvre le site réel et embarque la configuration Firebase officielle du projet fourni. Il reste nécessaire de vérifier dans Firebase que l’API FCM est activée et que le backend Edge possède le secret serveur `FCM_SERVER_KEY`. Il faut aussi appliquer la migration Supabase et ajouter un serveur TURN de production pour les réseaux mobiles stricts. Les clés privées Supabase et FCM ne doivent jamais être intégrées à l’APK.
+| Taille | Environ 49 Mo |
+| SHA-256 | `9462196edffc92e62098884e463d364dd7bb9b1525d60cf041fc43e3f663aff9` |
+| Commit source | `f28e9bd4` |
