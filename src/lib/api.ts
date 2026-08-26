@@ -963,6 +963,11 @@ export async function getProcessingDetails(request_id: string) {
 }
 
 export async function deleteProcessingDetails(request_id: string, screenshotUrls: string[] = []) {
+  const { error: exclusionError } = await supabase.rpc('exclude_request_from_agent_metrics', {
+    p_request_id: request_id,
+  });
+  if (exclusionError) throw exclusionError;
+
   // Les URLs sont enregistrées par Supabase Storage. La suppression du fichier est
   // volontairement tentée avant la ligne SQL, mais une capture déjà absente ne doit
   // pas empêcher l’agent de corriger sa ligne de traitement.
@@ -1041,6 +1046,8 @@ export async function getAgentProcessingDetailsByDate(agent_id: string, date: Da
       request:verification_requests!inner(
         phone_to_certify,
         created_at,
+        status,
+        exclude_from_agent_metrics,
         agent_id,
         applicant:profiles!applicant_id(username)
       )
@@ -1066,6 +1073,7 @@ export async function getAgentDailyTreatmentCounts(agent_id: string, daysBack = 
     .select('processed_at')
     .eq('agent_id', agent_id)
     .in('status', ['accepted', 'rejected'])
+    .eq('exclude_from_agent_metrics', false)
     .gte('processed_at', sinceUTC)
     .order('processed_at', { ascending: false })
     .limit(daysBack * 1000);

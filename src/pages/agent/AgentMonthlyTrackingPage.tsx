@@ -33,6 +33,7 @@ export default function AgentMonthlyTrackingPage() {
         .select('processed_at, status')
         .eq('agent_id', profile.id)
         .in('status', ['accepted', 'rejected'])
+        .eq('exclude_from_agent_metrics', false)
         .gte('processed_at', start.toISOString())
         .lte('processed_at', end.toISOString());
         

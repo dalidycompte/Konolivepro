@@ -32,6 +32,7 @@ export interface VerificationRequest {
   processed_at: string | null;
   processing_duration_seconds: number | null;
   processing_started_at: string | null;
+  exclude_from_agent_metrics?: boolean;
   assignment_source?: 'automatic' | 'manual';
   assigned_at?: string | null;
   applicant?: Profile;
