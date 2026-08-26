@@ -25,6 +25,7 @@ export interface VerificationRequest {
   applicant_id: string;
   agent_id: string | null;
   phone_to_certify: string;
+  coach_mobile?: string | null;
   status: RequestStatus;
   notes: string | null;
   created_at: string;

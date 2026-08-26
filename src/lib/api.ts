@@ -962,6 +962,19 @@ export async function getProcessingDetails(request_id: string) {
   return data as ProcessingDetails | null;
 }
 
+export async function updateAssignedRequestIdentity(
+  requestId: string,
+  updates: { phone?: string; coachMobile?: string },
+) {
+  const { data, error } = await supabase.rpc('update_assigned_request_identity', {
+    p_request_id: requestId,
+    p_phone: updates.phone ?? null,
+    p_coach_mobile: updates.coachMobile ?? null,
+  });
+  if (error) throw error;
+  return (data?.[0] ?? null) as { phone_to_certify: string; coach_mobile: string | null } | null;
+}
+
 export async function deleteProcessingDetails(request_id: string, screenshotUrls: string[] = []) {
   const { error: exclusionError } = await supabase.rpc('exclude_request_from_agent_metrics', {
     p_request_id: request_id,
@@ -1045,6 +1058,7 @@ export async function getAgentProcessingDetailsByDate(agent_id: string, date: Da
       *,
       request:verification_requests!inner(
         phone_to_certify,
+        coach_mobile,
         created_at,
         status,
         exclude_from_agent_metrics,

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   getAllRequests, getAgentProcessingDetailsByDate,
   getAgentDailyTreatmentCounts, saveProcessingDetails, getProcessingOptions,
-  deleteProcessingDetails,
+  deleteProcessingDetails, updateAssignedRequestIdentity,
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import type { ProcessingDetails, ProcessingOption } from '@/types/index';
@@ -47,6 +47,8 @@ function fmtDate(raw?: string | null, withTime = true) {
   catch { return '—'; }
 }
 function dateKey(d: Date) { return format(d, 'yyyy-MM-dd'); }
+function cleanPhone(raw?: string | null) { return (raw ?? '').replace(/^\+/, ''); }
+function coachLabel(request: any) { return request?.coach_mobile || request?.applicant?.username || ''; }
 
 // ── Filtre par colonne ────────────────────────────────────────────────────────
 interface ColFilterProps {
@@ -58,8 +60,8 @@ function ColFilter({ col, label, rows, colFilters, setColFilters }: ColFilterPro
   const vals = useMemo(() => {
     const s = new Set<string>();
     rows.forEach(r => {
-      const v = col === 'phone' ? (r.request?.phone_to_certify ?? '')
-              : col === 'coach' ? (r.request?.applicant?.username ?? '')
+      const v = col === 'phone' ? cleanPhone(r.request?.phone_to_certify)
+              : col === 'coach' ? coachLabel(r.request)
               : ((r[col] as string) ?? '');
       s.add(v);
     });
@@ -194,7 +196,7 @@ function EditableCell({ reqId, colKey, val, options, onSave }: EditableCellProps
   return (
     <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setText(val); }}>
       <PopoverTrigger asChild>
-        <div className="flex items-center gap-1 group cursor-pointer min-w-0">
+        <div className="flex max-w-full items-center gap-1 group cursor-pointer min-w-0 overflow-hidden">
           <span className="flex-1 min-w-0 truncate" title={val}>{val || '—'}</span>
           <Pencil size={9} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600" />
         </div>
@@ -231,6 +233,46 @@ function EditableCell({ reqId, colKey, val, options, onSave }: EditableCellProps
             </div>
           </ScrollArea>
         )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface EditableIdentityCellProps {
+  label: string;
+  value: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  onSave: (value: string) => Promise<void>;
+}
+function EditableIdentityCell({ label, value, inputMode, onSave }: EditableIdentityCellProps) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(value);
+  const [busy, setBusy] = useState(false);
+  const commit = async () => {
+    setBusy(true);
+    try { await onSave(text); setOpen(false); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setText(value); }}>
+      <PopoverTrigger asChild>
+        <div className="flex max-w-full items-center gap-1 group cursor-pointer min-w-0 overflow-hidden" title={value}>
+          <span className="flex-1 min-w-0 truncate">{value || '—'}</span>
+          <Pencil size={9} className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-600" />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-[230px] p-2 z-[9999]" align="start" side="bottom" avoidCollisions>
+        <p className="mb-1.5 text-[10px] font-bold uppercase text-muted-foreground">Modifier {label}</p>
+        <div className="flex items-center gap-1">
+          <input autoFocus value={text} inputMode={inputMode}
+            onChange={e => setText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setOpen(false); }}
+            className="flex-1 min-w-0 border border-border rounded px-2 text-xs h-7 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+          <button onClick={commit} disabled={busy} title="Enregistrer"
+            className="shrink-0 w-6 h-6 flex items-center justify-center bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50">
+            <Check size={11} />
+          </button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -322,16 +364,16 @@ export default function AgentMyGSMPage() {
     let rows = dayDetails;
     const q = detailSearch.trim().toLowerCase();
     if (q) rows = rows.filter(d => {
-      const phone = d.request?.phone_to_certify ?? '';
-      const coach = d.request?.applicant?.username ?? '';
+      const phone = cleanPhone(d.request?.phone_to_certify);
+      const coach = coachLabel(d.request);
       return phone.toLowerCase().includes(q) || coach.toLowerCase().includes(q) ||
         Object.values(d).some(v => typeof v === 'string' && v.toLowerCase().includes(q));
     });
     Object.entries(colFilters).forEach(([col, vals]) => {
       if (!vals || vals.size === 0) return;
       rows = rows.filter(d => {
-        const v = col === 'phone' ? (d.request?.phone_to_certify ?? '')
-                : col === 'coach' ? (d.request?.applicant?.username ?? '')
+        const v = col === 'phone' ? cleanPhone(d.request?.phone_to_certify)
+                : col === 'coach' ? coachLabel(d.request)
                 : ((d[col] as string) ?? '');
         return vals.has(v);
       });
@@ -350,9 +392,31 @@ export default function AgentMyGSMPage() {
     } catch { toast.error('Erreur de mise à jour'); }
   };
 
+  const handleIdentitySave = async (detail: any, field: 'phone' | 'coach', value: string) => {
+    const next = field === 'phone' ? cleanPhone(value) : value.trim();
+    if (!next) { toast.error(`${field === 'phone' ? 'Le numéro' : 'Le Coach mobile'} ne peut pas être vide.`); return; }
+    try {
+      const updated = await updateAssignedRequestIdentity(detail.request_id,
+        field === 'phone' ? { phone: next } : { coachMobile: next });
+      setDayDetails(prev => prev.map(row => row.request_id === detail.request_id ? {
+        ...row,
+        request: {
+          ...row.request,
+          phone_to_certify: updated?.phone_to_certify ?? row.request?.phone_to_certify,
+          coach_mobile: updated?.coach_mobile ?? row.request?.coach_mobile,
+        },
+      } : row));
+      toast.success(`${field === 'phone' ? 'Numéro' : 'Coach mobile'} mis à jour.`);
+    } catch (error) {
+      console.error('Request identity update failed', error);
+      toast.error('Impossible de modifier cette information.');
+      throw error;
+    }
+  };
+
   const handleDeleteRow = async (detail: any) => {
     if (!profile || !detail.request_id || deletingRequestId) return;
-    const phone = detail.request?.phone_to_certify ? `+${detail.request.phone_to_certify}` : 'ce numéro';
+    const phone = detail.request?.phone_to_certify ? cleanPhone(detail.request.phone_to_certify) : 'ce numéro';
     const confirmed = window.confirm(
       `Supprimer définitivement les détails de traitement et les captures de ${phone} ?\n\nCette action ne peut pas être annulée. La demande elle-même est conservée.`
     );
@@ -513,16 +577,24 @@ export default function AgentMyGSMPage() {
             ) : (
               <div className="overflow-x-auto">
                 <style>{`
+                  .my-gsm-table {
+                    table-layout: fixed;
+                  }
+                  .my-gsm-table th,
+                  .my-gsm-table td {
+                    overflow: hidden !important;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    vertical-align: middle;
+                  }
                   @media (min-width: 1024px) {
                     .my-gsm-table {
                       width: 100% !important;
                       min-width: 0 !important;
-                      table-layout: fixed;
                     }
                     .my-gsm-table th,
                     .my-gsm-table td {
                       min-width: 0 !important;
-                      max-width: none !important;
                     }
                     .my-gsm-table th {
                       white-space: normal !important;
@@ -534,7 +606,7 @@ export default function AgentMyGSMPage() {
                     }
                   }
                 `}</style>
-                <table className="my-gsm-table" style={{ borderCollapse: 'collapse', minWidth: 1180, fontSize, fontFamily, width: '100%' }}>
+                <table className="my-gsm-table" style={{ borderCollapse: 'collapse', minWidth: 1180, tableLayout: 'fixed', fontSize, fontFamily, width: '100%' }}>
                   <colgroup>
                     {DESKTOP_TABLE_WIDTHS.map((width, index) => (
                       <col key={index} style={{ '--desktop-column-width': width } as React.CSSProperties} />
@@ -554,7 +626,7 @@ export default function AgentMyGSMPage() {
                         <div className="flex items-center gap-1">NUMÉRO <ColFilter col="phone" label="NUMÉRO" rows={dayDetails} colFilters={colFilters} setColFilters={setColFilters} /></div>
                       </th>
                       <th style={{ backgroundColor: '#4472C4', color: '#fff', fontWeight: 700, padding: '3px 5px', border: '1px solid #000', minWidth: 100 }}>
-                        <div className="flex items-center gap-1">COACH <ColFilter col="coach" label="COACH" rows={dayDetails} colFilters={colFilters} setColFilters={setColFilters} /></div>
+                        <div className="flex items-center gap-1">COACH MOBILE <ColFilter col="coach" label="COACH MOBILE" rows={dayDetails} colFilters={colFilters} setColFilters={setColFilters} /></div>
                       </th>
                       <th style={{ backgroundColor: '#4472C4', color: '#fff', fontWeight: 700, padding: '3px 5px', border: '1px solid #000', minWidth: 115, whiteSpace: 'nowrap' }}>DATE/HEURE</th>
                       {DETAIL_COLS.map(c => (
@@ -580,10 +652,21 @@ export default function AgentMyGSMPage() {
                       return (
                         <tr key={d.request_id ?? i} style={{ backgroundColor: bg, color: '#000' }}>
                           <td style={{ border: '1px solid #000', padding: '2px 5px', textAlign: 'center', fontWeight: 600 }}>{i + 1}</td>
-                          <td style={{ border: '1px solid #000', padding: '2px 5px', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {d.request?.phone_to_certify ? `+${d.request.phone_to_certify}` : '—'}
+                          <td style={{ border: '1px solid #000', padding: '2px 5px', fontWeight: 600 }}>
+                            <EditableIdentityCell
+                              label="le numéro"
+                              value={cleanPhone(d.request?.phone_to_certify)}
+                              inputMode="tel"
+                              onSave={value => handleIdentitySave(d, 'phone', value)}
+                            />
                           </td>
-                          <td style={{ border: '1px solid #000', padding: '2px 5px', whiteSpace: 'nowrap' }}>{d.request?.applicant?.username ?? '—'}</td>
+                          <td style={{ border: '1px solid #000', padding: '2px 5px' }}>
+                            <EditableIdentityCell
+                              label="le Coach mobile"
+                              value={coachLabel(d.request)}
+                              onSave={value => handleIdentitySave(d, 'coach', value)}
+                            />
+                          </td>
                           <td style={{ border: '1px solid #000', padding: '2px 5px', whiteSpace: 'nowrap' }}>{fmtDate(d.created_at)}</td>
                           {DETAIL_COLS.map(c => (
                             <td key={c.key} style={{ border: '1px solid #000', padding: '2px 4px', maxWidth: c.w, minWidth: c.w, width: c.w }}>
