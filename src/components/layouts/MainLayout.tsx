@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -7,13 +7,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { useVideoCall } from '@/contexts/VideoCallContext';
 import { getDashboardPath } from '@/components/common/RouteGuard';
 import ThemeToggle from '@/components/common/ThemeToggle';
 import {
   LayoutDashboard, FileText, History, MessageSquare, Bell,
   Users, Settings, BarChart2, ClipboardList, LogOut,
-  Menu, ChevronRight, Shield, UserCheck, Eye, Video, Clock, Wifi, AlertTriangle, KeyRound, CalendarDays, TrendingUp, Settings2, Smartphone, Award, Phone,
+  Menu, Shield, UserCheck, Eye, Video, Clock, Wifi, AlertTriangle, KeyRound, CalendarDays, TrendingUp, Settings2, Smartphone, Award, Phone,
   Table as TableIcon, Plug,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,7 +21,7 @@ import InternalCallModal from '@/components/discussion/InternalCallModal';
 import { countUnreadInternalMessages } from '@/lib/api';
 import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { requestNotifPermission } from '@/lib/notifications';
-import type { Profile, InternalMessage, UserRole } from '@/types/types';
+import type { Profile, UserRole } from '@/types/types';
 
 interface NavItem {
   label: string;
@@ -338,32 +337,10 @@ const SidebarContent = memo(function SidebarContent({ onNavigate }: { onNavigate
 export default function MainLayout({ children, hideSidebar }: { children: React.ReactNode; hideSidebar?: boolean }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { profile, role } = useAuth();
-  const { startCall } = useVideoCall();
   const roleInfo = getRoleLabel(role);
 
   // ── Expiration automatique de session par inactivité ──────────────────
   useSessionTimeout(role);
-
-  // Global incoming call listener for applicants — works on any page
-  // Redirige vers la fenêtre flottante globale (FloatingVideoCall via VideoCallContext)
-  useEffect(() => {
-    if (!profile || role !== 'applicant') return;
-    const ch = supabase
-      .channel(`user-call-${profile.id}`)
-      .on('broadcast', { event: 'call_offer' }, ({ payload }) => {
-        if (payload?.applicant_id === profile.id) {
-          startCall({
-            callId: payload.call_id,
-            remoteUserName: payload.agent_name ?? 'Agent',
-            remoteUserPhoto: payload.agent_photo ?? null,
-            isInitiator: false,
-            requestId: payload.request_id ?? '',
-          });
-        }
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(ch).catch(err => console.warn('Erreur lors du nettoyage du canal:', err)); };
-  }, [profile, role, startCall]);
 
   // ── Global incoming INTERNAL call listener (agent & supervisor) ──────────
   // Runs on every page — receives call_invite regardless of current route

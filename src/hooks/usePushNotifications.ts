@@ -27,6 +27,18 @@ export interface IncomingCallPayload {
   expiresAt:   string;
 }
 
+async function registerDeviceToken(token: string) {
+  const key = 'konolive_device_id';
+  const deviceId = localStorage.getItem(key) ?? crypto.randomUUID();
+  localStorage.setItem(key, deviceId);
+  await supabase.rpc('register_mobile_push_device', {
+    p_device_id: deviceId,
+    p_token: token,
+    p_platform: Capacitor.isNativePlatform() ? 'android' : 'web',
+    p_app_version: import.meta.env.VITE_APP_VERSION ?? 'web',
+  });
+}
+
 /** Émet un CustomEvent global pour notifier VideoCallContext */
 export function dispatchIncomingCall(payload: IncomingCallPayload) {
   window.dispatchEvent(new CustomEvent('konolive:incoming_call', { detail: payload }));
@@ -53,18 +65,12 @@ export function usePushNotifications() {
         // Obtenir le token FCM
         const { token } = await FirebaseMessaging.getToken();
         if (token) {
-          await supabase
-            .from('profiles')
-            .update({ fcm_token: token })
-            .eq('id', profile.id);
+          await registerDeviceToken(token);
         }
 
         // Écoute le rafraîchissement du token
         await FirebaseMessaging.addListener('tokenReceived', async ({ token: newToken }) => {
-          await supabase
-            .from('profiles')
-            .update({ fcm_token: newToken })
-            .eq('id', profile.id);
+          await registerDeviceToken(newToken);
         });
 
         // ── Notification reçue en FOREGROUND ────────────────────────────
@@ -123,7 +129,7 @@ export function usePushNotifications() {
 }
 
 /** Fallback sur @capacitor/push-notifications si Firebase Messaging échoue */
-async function _fallbackCapacitorPush(userId: string) {
+async function _fallbackCapacitorPush(_userId: string) {
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
     const permission = await PushNotifications.requestPermissions();
@@ -131,7 +137,7 @@ async function _fallbackCapacitorPush(userId: string) {
     await PushNotifications.register();
 
     await PushNotifications.addListener('registration', async (token) => {
-      await supabase.from('profiles').update({ fcm_token: token.value }).eq('id', userId);
+      await registerDeviceToken(token.value);
     });
 
     await PushNotifications.addListener('pushNotificationReceived', (notification) => {

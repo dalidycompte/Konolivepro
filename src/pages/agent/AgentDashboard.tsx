@@ -227,8 +227,20 @@ export default function AgentDashboard() {
     if (!req) { toast.error('Demande introuvable.'); return; }
     const call = await createVideoCall({ request_id: req.id, agent_id: profile.id, applicant_id: req.applicant_id });
     if (!call) { toast.error("Impossible de démarrer l'appel."); return; }
+    // Créer l'état RINGING avant toute diffusion ou notification.
+    const { error: stateError } = await supabase.from('video_call_states').upsert([{
+      call_id: call.id,
+      caller_id: profile.id,
+      receiver_id: req.applicant_id,
+      state: 'RINGING',
+      caller_name: profile.username,
+      request_id: req.id,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+    }], { onConflict: 'call_id' });
+    if (stateError) { toast.error("Impossible de préparer l'appel."); return; }
+
     // Broadcast + notification vers le coach mobile
-    const broadcastPayload = { call_id: call.id, applicant_id: req.applicant_id, agent_name: profile.username, request_id: req.id };
+    const broadcastPayload = { call_id: call.id, applicant_id: req.applicant_id, agent_name: profile.username, request_id: req.id, expires_at: new Date(Date.now() + 60_000).toISOString() };
     const ch = supabase.channel(`user-call-${req.applicant_id}`);
     ch.subscribe(status => {
       if (status === 'SUBSCRIBED') {
@@ -247,8 +259,10 @@ export default function AgentDashboard() {
     await sendCallPush({
       callId:     call.id,
       receiverId: req.applicant_id,
-      callerName: profile.username ?? 'Agent Konolive',
-      requestId:  req.id,
+            callerName: profile.username ?? 'Agent Konolive',
+      requestId:   req.id,
+      action:      'INVITE',
+      expiresAt:   new Date(Date.now() + 60_000).toISOString(),
     });
     // Marquer la notif rappel comme lue + ouvrir l'appel
     await dismissRecall(notif.id);

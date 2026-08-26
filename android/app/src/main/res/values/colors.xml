@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="konolive_red">#D62828</color>
+    <color name="konolive_green">#138A4B</color>
+    <color name="konolive_background">#F1F5F9</color>
+    <color name="konolive_text">#16202A</color>
+</resources>

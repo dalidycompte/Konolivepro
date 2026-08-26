@@ -503,11 +503,24 @@ export default function ProcessRequestPage() {
     if (!request || !profile) return;
     const call = await createVideoCall({ request_id: request.id, agent_id: profile.id, applicant_id: request.applicant_id });
     if (!call) { toast.error("Impossible de démarrer l'appel"); return; }
-    
+
     // Récupérer les informations d'appel générique
     const { data: genericSettings } = await supabase.from('app_settings').select('value').eq('key', 'generic_call_settings').maybeSingle();
     const callerName = genericSettings?.value?.name || 'Agent Konolive';
     const callerPhoto = genericSettings?.value?.photo_url || null;
+
+    // Créer d'abord l'état RINGING : FCM et les autres appareils ne doivent
+    // jamais recevoir une invitation sans état serveur correspondant.
+    await startCall({
+      callId:          call.id,
+      remoteUserName:  request.applicant?.username ?? 'Coach mobile',
+      remoteUserPhoto: null,
+      isInitiator:     true,
+      requestId:       request.id,
+      receiverId:      request.applicant_id,
+      callerName,
+      callerPhoto,
+    } as any);
 
     const payload = { call_id: call.id, applicant_id: request.applicant_id, agent_name: callerName, agent_photo: callerPhoto, request_id: request.id };
     const broadcastChannels = [
@@ -529,25 +542,15 @@ export default function ProcessRequestPage() {
       body: `${callerName} vous appelle pour votre demande de vérification.`,
       request_id: request.id,
     });
-    // Envoyer notification push FCM (app fermée / verrouillée)
     await sendCallPush({
       callId:      call.id,
       receiverId:  request.applicant_id,
       callerName,
       callerPhoto,
       requestId:   request.id,
+      action:      'INVITE',
+      expiresAt:   new Date(Date.now() + 60_000).toISOString(),
     });
-    // Ouvre la fenêtre flottante globale — persistante pendant toute la navigation
-    startCall({
-      callId:          call.id,
-      remoteUserName:  request.applicant?.username ?? 'Coach mobile',
-      remoteUserPhoto: null,
-      isInitiator:     true,
-      requestId:       request.id,
-      receiverId:      request.applicant_id,
-      callerName,
-      callerPhoto,
-    } as any);
   }
   const [recallSent, setRecallSent] = useState(false);
 

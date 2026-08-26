@@ -35,6 +35,21 @@ const ICE_RESTART_DELAY_MS = 2000;
 // Intervalle de collecte des stats réseau (ms)
 const STATS_INTERVAL_MS    = 3000;
 
+async function updateSharedCallState(callId: string, action: 'REJECTED' | 'ENDED') {
+  const { data, error } = await supabase.rpc('respond_to_mobile_video_call', {
+    p_call_id: callId,
+    p_action: action,
+  });
+  if (error) return;
+  const row = Array.isArray(data) ? data[0] : data;
+  const receiverId = (row as { receiver_id?: string } | null)?.receiver_id;
+  if (receiverId) {
+    await supabase.functions.invoke('send-call-push', {
+      body: { callId, receiverId, action },
+    }).catch(() => {});
+  }
+}
+
 function getPermissionMessage(err: unknown): { title: string; detail: string } {
   const name = (err as DOMException)?.name ?? '';
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
@@ -116,6 +131,18 @@ export default function VideoCallModal({ callId, remoteUserName, remoteUserPhoto
     }
   }
 
+  // L’appelant ne doit pas rester bloqué si aucun appareil du coach ne répond.
+  useEffect(() => {
+    if (!isInitiator || callState !== 'ringing') return;
+    const timeout = window.setTimeout(async () => {
+      await updateSharedCallState(callId, 'ENDED');
+      cleanup();
+      setCallState('ended');
+      setTimeout(onClose, 1200);
+    }, 60_000);
+    return () => window.clearTimeout(timeout);
+  }, [callId, callState, cleanup, isInitiator, onClose]);
+
   const endCall = useCallback(async () => {
     const duration = startTimeRef.current
       ? Math.floor((Date.now() - startTimeRef.current) / 1000)
@@ -129,6 +156,7 @@ export default function VideoCallModal({ callId, remoteUserName, remoteUserPhoto
         setTimeout(() => supabase.removeChannel(reqChannel), 2000);
       }
     });
+    await updateSharedCallState(callId, 'ENDED');
     cleanup();
     setCallState('ended');
     await updateVideoCall(callId, {
@@ -383,6 +411,7 @@ export default function VideoCallModal({ callId, remoteUserName, remoteUserPhoto
         setTimeout(() => supabase.removeChannel(reqChannel), 2000);
       }
     });
+    await updateSharedCallState(callId, isInitiator ? 'ENDED' : 'REJECTED');
     await updateVideoCall(callId, { status: 'rejected' }).catch(console.error);
     cleanup();
     onClose();

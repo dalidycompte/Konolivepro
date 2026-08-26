@@ -1,0 +1,3 @@
+# Copy these entries into ~/.gradle/gradle.properties or android/gradle.properties.
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_ANON_KEY=YOUR_PUBLIC_SUPABASE_ANON_KEY

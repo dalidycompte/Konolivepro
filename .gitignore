@@ -17,3 +17,11 @@ coverage/
 # Temporary archives
 *.zip
 *.tar.gz
+
+# Android build outputs and local credentials
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/gradle.properties
+android/app/google-services.json

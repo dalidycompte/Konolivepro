@@ -18,6 +18,7 @@ interface Props {
   call:     IncomingCallPayload;
   onAccept: () => void;
   onReject: () => void;
+  onExpire?: () => void;
   timeoutSeconds?: number;
 }
 
@@ -25,6 +26,7 @@ export default function IncomingCallScreen({
   call,
   onAccept,
   onReject,
+  onExpire,
   timeoutSeconds = 60,
 }: Props) {
   const [remaining, setRemaining] = useState(timeoutSeconds);
@@ -56,14 +58,14 @@ export default function IncomingCallScreen({
       setRemaining(r => {
         if (r <= 1) {
           clearInterval(tick);
-          onReject(); // timeout → équivalent reject
+          (onExpire ?? onReject)();
           return 0;
         }
         return r - 1;
       });
     }, 1000);
     return () => clearInterval(tick);
-  }, [onReject]);
+  }, [onReject, onExpire]);
 
   const pct = (remaining / timeoutSeconds) * 100;
 
