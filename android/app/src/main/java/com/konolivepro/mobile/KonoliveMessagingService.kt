@@ -17,23 +17,23 @@ class KonoliveMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
-        when (data["type"]) {
-            "INCOMING_CALL" -> handleIncoming(data)
-            "CALL_STATE" -> handleCallState(data)
+        when (data["type"]?.lowercase()) {
+            "incoming_call" -> handleIncoming(data)
+            "call_state" -> handleCallState(data)
         }
     }
 
     private fun handleIncoming(data: Map<String, String>) {
         val call = IncomingCall(
-            callId = data[CALL_ID].orEmpty(),
-            callerId = data[CALLER_ID].orEmpty(),
-            callerName = data[CALLER_NAME] ?: "Agent Konolive",
-            callerPhoto = data[CALLER_PHOTO].orEmpty(),
-            receiverId = data[RECEIVER_ID].orEmpty(),
-            requestId = data[REQUEST_ID].orEmpty(),
-            callType = data[CALL_TYPE] ?: "video",
-            timestamp = data[TIMESTAMP].orEmpty(),
-            expiresAt = data[EXPIRES_AT].orEmpty(),
+            callId = data[CALL_ID] ?: data["call_id"].orEmpty(),
+            callerId = data[CALLER_ID] ?: data["caller_id"].orEmpty(),
+            callerName = data[CALLER_NAME] ?: data["caller_name"] ?: "Agent Konolive",
+            callerPhoto = data[CALLER_PHOTO] ?: data["caller_photo"].orEmpty(),
+            receiverId = data[RECEIVER_ID] ?: data["receiver_id"].orEmpty(),
+            requestId = data[REQUEST_ID] ?: data["request_id"].orEmpty(),
+            callType = data[CALL_TYPE] ?: data["video"]?.let { if (it == "true") "video" else "audio" } ?: "video",
+            timestamp = data[TIMESTAMP] ?: data["timestamp"].orEmpty(),
+            expiresAt = data[EXPIRES_AT] ?: data["expires_at"].orEmpty(),
         )
         if (call.callId.isBlank() || isExpired(call.expiresAt)) return
         getSharedPreferences("konolive_pending_call", MODE_PRIVATE)
@@ -43,7 +43,7 @@ class KonoliveMessagingService : FirebaseMessagingService() {
     }
 
     private fun handleCallState(data: Map<String, String>) {
-        val callId = data[CALL_ID].orEmpty()
+        val callId = data[CALL_ID] ?: data["call_id"].orEmpty()
         if (callId.isBlank()) return
         val pending = getSharedPreferences("konolive_pending_call", MODE_PRIVATE)
         val pendingCallId = runCatching { pending.getString("call", null)?.let { JSONObject(it).optString(CALL_ID) } }.getOrNull()
@@ -53,7 +53,7 @@ class KonoliveMessagingService : FirebaseMessagingService() {
         }
         sendBroadcast(Intent(ACTION_CALL_STATE).setPackage(packageName).apply {
             putExtra(CALL_ID, callId)
-            putExtra(CALL_STATE, data[CALL_STATE].orEmpty())
+            putExtra(CALL_STATE, data[CALL_STATE] ?: data["call_state"].orEmpty())
         })
     }
 
