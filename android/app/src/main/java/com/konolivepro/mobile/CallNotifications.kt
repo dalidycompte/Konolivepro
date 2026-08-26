@@ -38,11 +38,15 @@ object CallNotifications {
     fun showIncoming(context: Context, call: IncomingCall) {
         createChannels(context)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        val intent = Intent(context, MainActivity::class.java).apply {
+        val siteIntent = Intent(context, MainActivity::class.java).apply {
             putExtra(EXTRA_CALL_JSON, call.toJson().toString())
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-        val fullScreen = PendingIntent.getActivity(context, call.callId.hashCode(), intent, flags)
+        val callIntent = Intent(context, IncomingCallActivity::class.java).apply {
+            putExtra(EXTRA_CALL_JSON, call.toJson().toString())
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val fullScreen = PendingIntent.getActivity(context, call.callId.hashCode(), callIntent, flags)
         val person = Person.Builder().setName(call.callerName).setImportant(true).build()
         val builder = NotificationCompat.Builder(context, CALL_CHANNEL)
             .setSmallIcon(com.konolivepro.mobile.R.drawable.ic_konolive)
@@ -54,7 +58,7 @@ object CallNotifications {
             .setOngoing(true)
             .setAutoCancel(false)
             .setFullScreenIntent(fullScreen, true)
-            .setContentIntent(fullScreen)
+            .setContentIntent(PendingIntent.getActivity(context, call.callId.hashCode() + 3, siteIntent, flags))
             .setVibrate(longArrayOf(0, 500, 250, 500))
         if (Build.VERSION.SDK_INT >= 31) {
             val decline = PendingIntent.getActivity(context, call.callId.hashCode() + 1,
