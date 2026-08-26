@@ -884,7 +884,7 @@ export default function SupervisorDashboard() {
         )}
 
         {/* ── KPI cards ─────────────────────────────── */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:grid-cols-7">
           {loading
             ? Array.from({ length: 7 }).map((_, i) => <div key={i} className="neu-flat h-20 sm:h-24 rounded-xl animate-pulse" />)
             : kpiCards.map(c => (
@@ -1017,7 +1017,7 @@ export default function SupervisorDashboard() {
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-6">
+                <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
                   {/* CSS conic-gradient donut */}
                   <div className="shrink-0 relative" style={{ width: 140, height: 140 }}>
                     <div className="w-full h-full rounded-full" style={{ background: buildConicGradient(donutData) }} />
@@ -1210,7 +1210,7 @@ export default function SupervisorDashboard() {
               { label: 'Hors ligne',  value: offline, color: '#94a3b8', glow: 'rgba(148,163,184,0.2)',  bar: '#94a3b8' },
             ];
             return (
-              <div className="grid grid-cols-3 gap-4 mb-5">
+              <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                 {cols.map(col => {
                   const pct = Math.round((col.value / maxVal) * 100);
                   return (
@@ -1280,7 +1280,7 @@ export default function SupervisorDashboard() {
         {/* ── Tableau Statistiques par localité — professionnel ── */}
         <div className="neu-card mt-6 mb-6 overflow-hidden">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
-            <h2 className="font-bold text-base flex items-center gap-2" style={{ color: 'var(--neu-text)' }}>
+            <h2 className="flex flex-wrap items-center gap-2 text-base font-bold" style={{ color: 'var(--neu-text)' }}>
               <MapPin size={18} className="text-primary" />
               Statistiques par localité
               <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: 'hsl(var(--primary)/0.12)', color: 'hsl(var(--primary))' }}>

@@ -880,12 +880,12 @@ export default function ProcessRequestPage() {
 
   return (
     <MainLayout>
-      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
+      <div className="mx-auto flex max-w-6xl min-w-0 flex-col gap-6 lg:flex-row">
         
         {/* Main Content */}
         <div className="flex-1 space-y-6 min-w-0">
           {/* Header */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Bouton retour — désactivé si demande en cours */}
           <button
             onClick={() => { if (isActive) { setShowBlockModal(true); } else { navigate('/agent'); } }}
@@ -895,7 +895,7 @@ export default function ProcessRequestPage() {
             }`}>
             <ArrowLeft size={18} />
           </button>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold text-foreground text-balance">Traiter la demande</h1>
             <p className="text-xs text-muted-foreground font-mono">{request.id.slice(0, 8)}…</p>
           </div>
@@ -940,7 +940,7 @@ export default function ProcessRequestPage() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border text-sm">
+              <div className="grid grid-cols-1 gap-3 border-t border-border pt-3 text-sm sm:grid-cols-2">
                 <div><p className="text-xs text-muted-foreground">Coach mobile</p><p className="font-medium">{request.applicant?.username}</p></div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Localité</p>
@@ -1240,10 +1240,10 @@ export default function ProcessRequestPage() {
 
       {showProcessingDetails && (
         <Dialog open={showProcessingDetails} onOpenChange={(open) => { if (!open) return; setShowProcessingDetails(open); }}>
-          <DialogContent style={{ backgroundColor: '#5C3317', color: '#ffffff', border: '3px solid #5C3317', outline: 'none' }} className="max-w-[100vw] w-screen h-screen max-h-[100vh] m-0 rounded-none overflow-hidden flex flex-col [&>button.absolute]:hidden" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogContent style={{ backgroundColor: '#5C3317', color: '#ffffff', border: '3px solid #5C3317', outline: 'none' }} className="m-0 flex h-[100dvh] w-[100dvw] max-h-[100dvh] max-w-none flex-col overflow-hidden rounded-none [&>button.absolute]:hidden" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             {/* ── Barre du haut : titre + compteur + bouton Enregistrer ── */}
-            <div style={{ backgroundColor: '#5C3317', borderBottom: '2px solid #3d2010' }} className="px-4 py-2 shrink-0 flex items-center justify-between gap-2">
-              <DialogTitle style={{ color: '#ffffff' }} className="text-base font-bold flex items-center gap-2 m-0">
+            <div style={{ backgroundColor: '#5C3317', borderBottom: '2px solid #3d2010' }} className="flex shrink-0 flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+              <DialogTitle style={{ color: '#ffffff' }} className="m-0 flex min-w-0 flex-wrap items-center gap-2 text-base font-bold">
                 <span>Détails de Traitement</span>
                 <span style={{ backgroundColor: '#3d2010', color: '#FFC000' }} className="text-xs font-bold px-2 py-0.5 rounded">
                   {recentDetails.length} numéro{recentDetails.length > 1 ? 's' : ''} traité{recentDetails.length > 1 ? 's' : ''}
@@ -1260,7 +1260,7 @@ export default function ProcessRequestPage() {
                   variant="dark"
                 />
               </DialogTitle>
-              <Button onClick={confirmProcessingDetails} style={{ backgroundColor: '#22c55e', color: '#ffffff' }} className="h-8 px-5 text-sm font-semibold shrink-0 hover:opacity-90">
+              <Button onClick={confirmProcessingDetails} style={{ backgroundColor: '#22c55e', color: '#ffffff' }} className="h-8 w-full shrink-0 px-5 text-sm font-semibold hover:opacity-90 sm:w-auto">
                 Enregistrer
               </Button>
             </div>

@@ -550,10 +550,10 @@ export default function AgentMyGSMPage() {
       )}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
 
-      <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--neu-base)' }}>
+      <div className="flex h-[100dvh] min-h-[100dvh] max-w-full flex-col overflow-hidden" style={{ background: 'var(--neu-base)' }}>
 
         {/* ── Barre de navigation ───────────────────────────────────────────── */}
-        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border" style={{ background: 'var(--neu-base)' }}>
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3 sm:gap-3 sm:px-4" style={{ background: 'var(--neu-base)' }}>
           <button onClick={() => navigate('/agent')}
             className="shrink-0 flex items-center gap-1.5 neu-flat px-3 py-2 rounded-xl text-sm font-medium text-foreground hover:text-primary transition-colors">
             <ChevronLeft size={16} /><span className="hidden md:inline">Retour</span>
@@ -602,8 +602,8 @@ export default function AgentMyGSMPage() {
         </div>
 
         {/* ── Sous-barre : date + recherche + filtres ───────────────────────── */}
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-border" style={{ background: 'var(--neu-base)' }}>
-          <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 sm:px-4" style={{ background: 'var(--neu-base)' }}>
+          <div className="flex min-w-0 items-center gap-2">
             <CalendarDays size={14} className="text-primary shrink-0" />
             <span className="text-xs font-bold text-foreground capitalize">{selLabel}</span>
             {(dayCounts[selKey] ?? 0) > 0 ? (
@@ -614,8 +614,8 @@ export default function AgentMyGSMPage() {
               <span className="text-[11px] text-muted-foreground">Aucun traitement ce jour</span>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative" style={{ minWidth: 180 }}>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-[180px]">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="Rechercher…" value={detailSearch}
                 onChange={e => setDetailSearch(e.target.value)} className="pl-8 h-7 text-xs" />
@@ -633,8 +633,8 @@ export default function AgentMyGSMPage() {
         </div>
 
         {/* ── Tableau principal ─────────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-auto px-4 pb-6">
-          <div className="neu-card mt-3">
+        <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-auto px-3 pb-6 sm:px-4">
+          <div className="neu-card mt-3 min-w-0 max-w-full">
             {loadingBase || loadingDay ? (
               <div className="space-y-2">{[1,2,3,4].map(i => (
                 <div key={i} className="neu-pressed h-9 rounded-xl animate-pulse" />
@@ -648,7 +648,7 @@ export default function AgentMyGSMPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="max-w-full overflow-x-auto overscroll-x-contain">
                 <style>{`
                   .my-gsm-table {
                     table-layout: fixed;

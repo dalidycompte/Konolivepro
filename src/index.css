@@ -379,12 +379,30 @@
   * { @apply border-border; }
   *  { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
 
-  html { font-family: var(--font-sans); }
+  html {
+    font-family: var(--font-sans);
+    min-width: 0;
+    overflow-x: hidden;
+  }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     line-height: 1.5;
+    min-width: 0;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-width: 0;
+    min-height: 100dvh;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
   }
 }
 
@@ -514,4 +532,12 @@
   /* désactive will-change par défaut pour économiser la mémoire GPU */
   .neu-card, .kpi-card, .stat-card { will-change: auto; }
   .neu-btn-primary, .neu-btn-secondary { will-change: auto; }
+}
+
+/* Les tableaux denses conservent leur défilement horizontal à l’intérieur
+   de leurs propres wrappers. Ces règles ne masquent que le débordement
+   accidentel du document sur les petits écrans. */
+@media (max-width: 767px) {
+  .neu-card { @apply p-4; }
+  .page-title { @apply text-xl; }
 }

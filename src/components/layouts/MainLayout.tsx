@@ -447,7 +447,7 @@ export default function MainLayout({ children, hideSidebar }: { children: React.
   }, [profile, role]);
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-[100dvh] w-full min-w-0 bg-background">
       {/* ── Sidebar desktop ───────────────────────── */}
       {!hideSidebar && (
         <aside className="hidden md:flex flex-col w-60 shrink-0 fixed inset-y-0 left-0 z-30">
@@ -468,7 +468,7 @@ export default function MainLayout({ children, hideSidebar }: { children: React.
                   <Menu size={20} />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-60" aria-describedby={undefined}>
+              <SheetContent side="left" className="w-60 max-w-[calc(100vw-2rem)] p-0" aria-describedby={undefined}>
                 <SidebarContent onNavigate={() => setMobileOpen(false)} />
               </SheetContent>
             </Sheet>
@@ -502,14 +502,14 @@ export default function MainLayout({ children, hideSidebar }: { children: React.
           </header>
         )}
 
-        <main className={cn('flex-1', hideSidebar ? 'p-0' : 'p-4 md:p-6')}>
+        <main className={cn('flex-1 min-w-0 max-w-full', hideSidebar ? 'p-0' : 'p-4 md:p-6')}>
           {children}
         </main>
       </div>
 
       {/* ── Bannière appel interne entrant ─────────── */}
       {globalInternalCall && !activeInternalCall && (
-        <div className="fixed bottom-6 right-6 z-50 w-80 saas-card p-4 border border-primary/20 animate-in slide-in-from-bottom-4 shadow-lg">
+        <div className="fixed inset-x-4 bottom-4 z-50 max-w-none saas-card p-4 border border-primary/20 animate-in slide-in-from-bottom-4 shadow-lg md:inset-x-auto md:bottom-6 md:right-6 md:w-80">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Phone size={16} className="text-primary animate-pulse" />
