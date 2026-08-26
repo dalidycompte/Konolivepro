@@ -85,6 +85,48 @@ class SupabaseApi(context: Context) {
         return rows.optJSONObject(0)?.optString("state")
     }
 
+    suspend fun getApplicantRequests(limit: Int = 50): List<ApplicantRequest> {
+        val userId = store.userId ?: return emptyList()
+        val urlUser = android.net.Uri.encode(userId)
+        val request = requestBuilder("$baseUrl/rest/v1/verification_requests?applicant_id=eq.$urlUser&select=id,phone_to_certify,status,notes,created_at&order=created_at.desc&limit=$limit")
+            .get().build()
+        val rows = JSONArray(execute(request))
+        return (0 until rows.length()).mapNotNull { index ->
+            rows.optJSONObject(index)?.let { row ->
+                ApplicantRequest(row.optString("id"), row.optString("phone_to_certify"), row.optString("status"), row.optString("notes").takeIf { it.isNotBlank() }, row.optString("created_at"))
+            }
+        }
+    }
+
+    suspend fun getApplicantNotifications(limit: Int = 5): List<ApplicantNotification> {
+        val userId = store.userId ?: return emptyList()
+        val urlUser = android.net.Uri.encode(userId)
+        val request = requestBuilder("$baseUrl/rest/v1/notifications?user_id=eq.$urlUser&select=id,title,body,is_read,created_at&order=created_at.desc&limit=$limit")
+            .get().build()
+        val rows = JSONArray(execute(request))
+        return (0 until rows.length()).mapNotNull { index ->
+            rows.optJSONObject(index)?.let { row ->
+                ApplicantNotification(row.optString("id"), row.optString("title"), row.optString("body"), row.optBoolean("is_read"), row.optString("created_at"))
+            }
+        }
+    }
+
+    suspend fun createVerificationRequest(phone: String) {
+        val body = JSONObject().put("p_phone", phone)
+        val request = requestBuilder("$baseUrl/rest/v1/rpc/create_mobile_verification_request")
+            .post(body.toString().toRequestBody(jsonType)).build()
+        execute(request)
+    }
+
+    suspend fun getProfileUsername(): String? {
+        val userId = store.userId ?: return null
+        val encoded = android.net.Uri.encode(userId)
+        val request = requestBuilder("$baseUrl/rest/v1/profiles?id=eq.$encoded&select=username")
+            .get().build()
+        val rows = JSONArray(execute(request))
+        return rows.optJSONObject(0)?.optString("username")?.takeIf { it.isNotBlank() }
+    }
+
     fun realtimeWebSocketUrl(): String = baseUrl
         .replaceFirst("https://", "wss://")
         .replaceFirst("http://", "ws://") + "/realtime/v1/websocket?apikey=$anonKey&vsn=1.0.0"

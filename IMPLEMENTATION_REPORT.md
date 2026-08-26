@@ -2,28 +2,43 @@
 
 ## Résultat
 
-Le dépôt `dalidycompte/Konolivepro` contient maintenant un projet Android natif Kotlin dans `android/`. Il ne s’agit pas d’une WebView. L’application comprend l’authentification coach, l’enregistrement des appareils Android, la réception FCM data-only, la notification d’appel plein écran, la sonnerie, la vibration, l’acceptation, le refus, l’expiration, l’appel WebRTC et l’arrêt propre de la caméra, du microphone et du service au premier plan.
+Le dépôt `dalidycompte/Konolivepro` contient une application Android native Kotlin dans `android/`. Elle n’est pas une WebView. Son interface reprend le système visuel du site Konolivepro : fond gris-bleu neumorphique, accent rouge, cartes en relief, identité « Konolive », connexion Coach Mobile, tableau de bord, statistiques, demandes, notifications, messages, paramètres et navigation inférieure.
 
-Le site et le backend ont été adaptés pour créer l’état `RINGING` avant l’envoi d’une invitation, utiliser une machine d’état atomique côté PostgreSQL, empêcher l’acceptation après expiration, synchroniser `video_calls`, propager les états aux autres appareils et supprimer l’écouteur web dupliqué.
+L’application conserve les fonctions natives d’appel entrant : FCM data-only, notification plein écran, sonnerie, vibration, acceptation, refus, expiration, WebRTC, caméra, microphone, service au premier plan et synchronisation multi-appareils.
 
-## Fichiers principaux
+## Équivalence avec le site web
 
-| Domaine | Fichier |
+| Parcours web | Équivalent Android natif |
 |---|---|
-| Application Android | `android/app/src/main/java/com/konolivepro/mobile/` |
-| Configuration Android | `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml` |
-| RPC et registre multi-appareils | `supabase/migrations/00029_native_android_call_reliability.sql` |
-| Invitations et annulations FCM | `supabase/functions/send-call-push/index.ts` |
-| Synchronisation web | `src/contexts/VideoCallContext.tsx`, `src/components/video/VideoCallModal.tsx` |
+| Connexion | Formulaire identifiant ou e-mail et mot de passe avec la même convention de compte. |
+| Tableau de bord | Bienvenue, disponibilité, nouvelle demande, statistiques du jour, demandes récentes et notifications récentes. |
+| Nouvelle demande | Saisie du numéro à certifier et création via le RPC Supabase partagé. |
+| Historique des demandes | Liste native des demandes avec numéro, date et statut. |
+| Notifications | Liste native des notifications Supabase. |
+| Messages | Écran natif réservé aux échanges Coach Mobile. |
+| Paramètres | Profil, configuration batterie et déconnexion. |
+| Appel entrant | Écran Android plein écran prioritaire, indépendant du cycle de vie de l’application. |
+
+## Backend et synchronisation
+
+La migration `supabase/migrations/00029_native_android_call_reliability.sql` ajoute le registre des appareils, les transitions atomiques et les états `RINGING`, `ACCEPTED`, `CONNECTED`, `REJECTED`, `EXPIRED` et `ENDED`. La fonction `supabase/functions/send-call-push` envoie les événements à tous les appareils Android du Coach Mobile. Le site crée maintenant l’état `RINGING` avant de publier l’invitation et ferme les appels sur les autres appareils lorsqu’un état final est reçu.
 
 ## Vérifications réalisées
 
-Le build de production du site web a réussi avec `npm run build` et la vérification `git diff --check` a réussi. La configuration Gradle Android a été validée avec `./gradlew help`.
+Le build de production du site web a réussi avec `npm run build`, la configuration Gradle Android a réussi avec `./gradlew help`, et l’APK a été compilé avec `./gradlew assembleDebug`. Le fichier produit est signé avec la clé debug et vérifié par `apksigner`.
 
-La génération de l’APK n’a pas pu être exécutée dans l’environnement actuel, car aucun Android SDK n’est installé. Gradle a indiqué qu’il faut définir `ANDROID_HOME` ou `android/local.properties`. La compilation Android nécessite également le fichier privé Firebase `android/app/google-services.json`, à fournir par le propriétaire du projet Firebase.
+| Élément | Valeur |
+|---|---|
+| APK | `android/app/build/outputs/apk/debug/app-debug.apk` |
+| Package | `com.konolivepro.mobile` |
+| Taille | Environ 49 Mo |
+| Compatibilité déclarée | Android 8.0 ou supérieur, SDK 26 à 35 |
+| SHA-256 de l’APK actuel | `37f1a3b4b3a39941fe6cb66fab725c3dd3d3815274b53222cc9ce4587db2d302` |
 
-## Mise en service nécessaire
+## Configuration production à remplacer
 
-Avant un test réel, appliquer la migration Supabase, déployer la fonction `send-call-push`, renseigner le secret serveur `FCM_SERVER_KEY`, placer le fichier Firebase correspondant au package `com.konolivepro.mobile`, puis fournir l’URL et la clé publique Supabase dans les propriétés Gradle locales. Un serveur TURN de production doit aussi être ajouté dans `CallActivity.kt` pour garantir les appels sur les réseaux mobiles et les NAT stricts.
+L’APK livré est compilé avec une configuration Firebase temporaire de debug afin de permettre la génération de l’artefact. Il s’installe et contient la configuration publique Supabase du site, mais les notifications FCM réelles nécessitent le fichier Firebase privé `android/app/google-services.json` du projet Konolivepro, placé localement puis suivi d’une nouvelle compilation.
 
-Le commit publié est `6f1b1a99` sur la branche `main`.
+Avant le premier test réel, appliquer la migration Supabase, déployer la fonction `send-call-push`, configurer le secret serveur `FCM_SERVER_KEY`, renseigner les paramètres Supabase locaux et ajouter un serveur TURN de production dans `CallActivity.kt`. La clé de service Supabase et la clé FCM ne doivent jamais être intégrées à l’APK.
+
+Le dernier commit publié est `e0783405` sur la branche `main`.
