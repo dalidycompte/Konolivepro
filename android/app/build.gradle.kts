@@ -43,5 +43,5 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.firebase:firebase-messaging:24.1.0")
-    implementation("org.webrtc:google-webrtc:1.0.32006")
+    implementation("io.getstream:stream-webrtc-android:1.3.9")
 }

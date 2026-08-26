@@ -23,6 +23,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.webrtc.AudioSource
+import org.webrtc.EglBase
 import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
 import org.webrtc.CameraVideoCapturer
@@ -54,6 +55,7 @@ class CallActivity : ComponentActivity() {
     private var surfaceHelper: SurfaceTextureHelper? = null
     private var monitorJob: Job? = null
     private var finishing = false
+    private val eglBase: EglBase by lazy { EglBase.create() }
     private val pendingCandidates = mutableListOf<IceCandidate>()
 
     private val permissionLauncher = registerForActivityResult(
@@ -109,8 +111,8 @@ class CallActivity : ComponentActivity() {
             PeerConnectionFactory.InitializationOptions.builder(this).setEnableInternalTracer(false).createInitializationOptions()
         )
         factory = PeerConnectionFactory.builder().createPeerConnectionFactory()
-        remoteView.init(factory!!.eglBaseContext, null)
-        localView.init(factory!!.eglBaseContext, null)
+        remoteView.init(eglBase.eglBaseContext, null)
+        localView.init(eglBase.eglBaseContext, null)
         remoteView.setEnableHardwareScaler(true)
         localView.setEnableHardwareScaler(true)
         setupMedia()
@@ -143,7 +145,7 @@ class CallActivity : ComponentActivity() {
         val cameraName = enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) }
         if (cameraName != null) {
             cameraCapturer = enumerator.createCapturer(cameraName, null)
-            surfaceHelper = SurfaceTextureHelper.create("KonoliveCamera", f.eglBaseContext)
+            surfaceHelper = SurfaceTextureHelper.create("KonoliveCamera", eglBase.eglBaseContext)
             cameraCapturer?.initialize(surfaceHelper, this, cameraSource?.capturerObserver)
             cameraCapturer?.startCapture(640, 480, 24)
             localVideo = f.createVideoTrack("konolive-video", cameraSource)
@@ -162,6 +164,7 @@ class CallActivity : ComponentActivity() {
             }
         }
         override fun onIceGatheringChange(state: PeerConnection.IceGatheringState) = Unit
+        override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
         override fun onIceCandidate(candidate: IceCandidate) {
             realtime?.sendBroadcast("ice_candidate", JSONObject().apply {
                 put("from", SessionStore(this@CallActivity).userId ?: "android")
@@ -230,7 +233,7 @@ class CallActivity : ComponentActivity() {
         peer?.close(); peer = null
         cameraCapturer?.let { runCatching { it.stopCapture() } }
         cameraCapturer?.dispose(); cameraSource?.dispose(); localAudio?.dispose()
-        localView.release(); remoteView.release(); surfaceHelper?.dispose()
+        localView.release(); remoteView.release(); surfaceHelper?.dispose(); eglBase.release()
         stopService(Intent(this, CallForegroundService::class.java))
         CallNotifications.cancelIncoming(this)
         finish()

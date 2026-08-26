@@ -1,3 +1,9 @@
-# Copy these entries into ~/.gradle/gradle.properties or android/gradle.properties.
+org.gradle.jvmargs=-Xmx768m -Dfile.encoding=UTF-8
+org.gradle.workers.max=1
+org.gradle.daemon=false
+android.useAndroidX=true
+kotlin.code.style=official
+kotlin.compiler.execution.strategy=in-process
+android.nonTransitiveRClass=true
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_ANON_KEY=YOUR_PUBLIC_SUPABASE_ANON_KEY
