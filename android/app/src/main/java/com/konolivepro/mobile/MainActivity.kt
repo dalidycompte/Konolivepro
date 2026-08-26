@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
@@ -39,6 +40,13 @@ class MainActivity : ComponentActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingFcmToken: String? = null
     private var pendingWebPermission: PermissionRequest? = null
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) Log.d("KONOLIVE", "Notifications autorisées")
+        else Log.d("KONOLIVE", "Notifications refusées")
+    }
 
     private val mediaPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -107,10 +115,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            registerForActivityResult(ActivityResultContracts.RequestPermission()) {}.launch(Manifest.permission.POST_NOTIFICATIONS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun configureWebView() {
