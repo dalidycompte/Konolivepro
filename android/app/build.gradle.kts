@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.konolivepro.mobile"
+        applicationId = "com.dalidycompte.konolive"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

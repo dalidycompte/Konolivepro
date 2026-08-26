@@ -2,11 +2,11 @@
 
 ## Résultat
 
-L’APK Android Konolivepro est maintenant un **conteneur natif du site web réel**. Au lancement, l’application ouvre `https://dalidycompte.github.io/Konolivepro/` dans une WebView Android sécurisée. Les utilisateurs retrouvent donc le site, ses routes HashRouter, son authentification Supabase, ses écrans métier et son identité visuelle directement dans l’application, sans passer par le navigateur externe.
+L’APK Android Konolivepro est un **conteneur natif du site web réel**. Au lancement, l’application ouvre `https://dalidycompte.github.io/Konolivepro/` dans une WebView Android sécurisée. Les utilisateurs retrouvent donc le site, ses routes HashRouter, son authentification Supabase, ses écrans métier et son identité visuelle directement dans l’application, sans passer par le navigateur externe.
 
 L’application native fournit la couche Android autour du site : navigation interne avec le bouton Retour, conservation du stockage local et de la session, liens du site ouverts dans l’application, liens externes sécurisés dans le navigateur, sélection de fichiers, capture caméra, accès microphone pour WebRTC, notifications FCM et appels entrants plein écran.
 
-## Fonctionnalités prises en charge par le conteneur
+## Fonctionnalités prises en charge
 
 | Fonction du site | Prise en charge Android |
 |---|---|
@@ -20,27 +20,27 @@ L’application native fournit la couche Android autour du site : navigation int
 | Bouton Retour Android | Retourne dans l’historique WebView avant de fermer l’application. |
 | Liens externes et `mailto:`/`tel:` | Ouvrent le navigateur ou l’application système correspondante. |
 
-## Architecture
+## Configuration Firebase
 
-Le point d’entrée est `android/app/src/main/java/com/konolivepro/mobile/MainActivity.kt`. Il configure la WebView, active JavaScript et DOM Storage uniquement pour le site, limite les permissions média au domaine `dalidycompte.github.io`, gère les fichiers et relie les événements FCM aux événements JavaScript `konolive:incoming_call` et `konolive:call_state` déjà consommés par le site.
-
-Le service `KonoliveMessagingService` conserve la réception en arrière-plan. `CallNotifications` affiche les notifications d’appel plein écran et transmet l’ouverture vers `MainActivity`. Le backend partagé conserve la machine d’état atomique et l’annulation multi-appareils.
+Le fichier Firebase officiel fourni a été utilisé localement pour produire l’APK. Il correspond au projet `konolivepro` et au package Android `com.dalidycompte.konolive`. Le fichier `google-services.json` est ignoré par Git et n’est pas publié dans le dépôt.
 
 ## Vérifications réalisées
 
-Le build de production du site web a réussi avec `npm run build`. La configuration Gradle Android a réussi avec `./gradlew help`. L’APK WebView actuel a été compilé avec `./gradlew assembleDebug`, puis vérifié avec `apksigner` et `aapt`.
+Le build de production du site web a réussi avec `npm run build`. La configuration Gradle Android a réussi avec `./gradlew help`. L’APK WebView actuel a été compilé avec `./gradlew clean assembleDebug`, puis vérifié avec `apksigner` et `aapt`.
 
 | Élément | Valeur |
 |---|---|
 | APK | `android/app/build/outputs/apk/debug/app-debug.apk` |
-| Package | `com.konolivepro.mobile` |
+| Package | `com.dalidycompte.konolive` |
 | Taille | Environ 49 Mo |
 | Compatibilité déclarée | Android 8.0 ou supérieur, SDK 26 à 35 |
-| SHA-256 de l’APK WebView | `e86cec6f5067de18aec0f97cdccc4d490a0632eac70dcd11d03b535f58ace94b` |
-| Dernier commit publié | `b5c4836f` |
+| SHA-256 de l’APK Firebase | `3205a5659035fb31e00de5e3283538cbdb5f05d7f5572fb2a9d9eaf271c41b16` |
+| Dernier commit publié | À mettre à jour après publication du package Firebase |
 
-## Configuration à finaliser pour la production
+## Backend et synchronisation
 
-L’APK livré est compilé avec une configuration Firebase temporaire de debug afin de produire l’artefact dans l’environnement disponible. Il ouvre bien le site réel et contient la configuration publique Supabase du site. Pour recevoir les notifications FCM réelles, remplacer localement `android/app/google-services.json` par le fichier officiel Firebase correspondant au package `com.konolivepro.mobile`, puis reconstruire l’APK.
+La migration `supabase/migrations/00029_native_android_call_reliability.sql` ajoute le registre des appareils, les transitions atomiques et les états `RINGING`, `ACCEPTED`, `CONNECTED`, `REJECTED`, `EXPIRED` et `ENDED`. La fonction `supabase/functions/send-call-push` envoie les événements aux appareils Android du Coach Mobile. Le site crée l’état `RINGING` avant de publier l’invitation et ferme les appels sur les autres appareils lorsqu’un état final est reçu.
 
-Avant un test complet, appliquer également la migration Supabase, déployer `send-call-push`, configurer `FCM_SERVER_KEY` et ajouter un serveur TURN de production pour les réseaux mobiles stricts. Les clés privées Supabase et FCM ne doivent jamais être intégrées à l’APK.
+## Mise en production
+
+L’APK joint ouvre le site réel et embarque la configuration Firebase officielle du projet fourni. Il reste nécessaire de vérifier dans Firebase que l’API FCM est activée et que le backend Edge possède le secret serveur `FCM_SERVER_KEY`. Il faut aussi appliquer la migration Supabase et ajouter un serveur TURN de production pour les réseaux mobiles stricts. Les clés privées Supabase et FCM ne doivent jamais être intégrées à l’APK.
