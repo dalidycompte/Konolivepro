@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   getAllRequests, getAgentProcessingDetailsByDate,
   getAgentDailyTreatmentCounts, saveProcessingDetails, getProcessingOptions,
-  deleteProcessingDetails, updateAssignedRequestIdentity,
+  deleteProcessingDetails, updateAssignedRequestIdentity, removeProcessingScreenshot,
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import type { ProcessingDetails, ProcessingOption } from '@/types/index';
@@ -68,13 +68,15 @@ function ColFilter({ col, label, rows, colFilters, setColFilters }: ColFilterPro
     return Array.from(s).sort();
   }, [rows, col]);
   const active = colFilters[col];
-  const hasFilter = active && active.size > 0;
+  const hasFilter = active !== undefined;
   const toggle = (val: string) => setColFilters(prev => {
     const cur = new Set(prev[col] ?? []);
     if (cur.has(val)) cur.delete(val); else cur.add(val);
     return { ...prev, [col]: cur };
   });
   const clear = () => setColFilters(prev => { const n = { ...prev }; delete n[col]; return n; });
+  const selectAll = () => setColFilters(prev => ({ ...prev, [col]: new Set(vals) }));
+  const selectNone = () => setColFilters(prev => ({ ...prev, [col]: new Set() }));
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -85,14 +87,22 @@ function ColFilter({ col, label, rows, colFilters, setColFilters }: ColFilterPro
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[180px] p-0 z-[9999]" align="start" side="bottom" avoidCollisions>
-        <div className="flex items-center justify-between px-2 py-1.5 border-b bg-muted/30">
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 border-b bg-muted/30">
           <span className="text-[10px] font-bold uppercase text-muted-foreground">{label}</span>
-          {hasFilter && <button onClick={clear} className="text-[9px] text-orange-600 hover:underline">Effacer</button>}
+          <div className="flex items-center gap-1.5 text-[9px] font-medium">
+            <button onClick={selectAll} className="text-primary hover:underline">Tout</button>
+            <span className="text-muted-foreground">|</span>
+            <button onClick={selectNone} className="text-destructive hover:underline">Aucun</button>
+            {hasFilter && <>
+              <span className="text-muted-foreground">|</span>
+              <button onClick={clear} className="text-orange-600 hover:underline">Effacer</button>
+            </>}
+          </div>
         </div>
         <ScrollArea className="h-[150px]">
           <div className="p-1">
             {vals.map(val => {
-              const checked = !active || active.size === 0 || active.has(val);
+              const checked = !active || active.has(val);
               return (
                 <label key={val} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent cursor-pointer">
                   <input type="checkbox" checked={checked} onChange={() => toggle(val)} className="h-3 w-3 accent-blue-600" />
@@ -297,6 +307,7 @@ export default function AgentMyGSMPage() {
   const [fontFamily, setFontFamily]   = useState(TABLE_FONT_DEFAULT);
   const [fontSize, setFontSize]       = useState(TABLE_SIZE_DEFAULT);
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
+  const [removingScreenshot, setRemovingScreenshot] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadForRef = useRef<string | null>(null);
@@ -370,7 +381,7 @@ export default function AgentMyGSMPage() {
         Object.values(d).some(v => typeof v === 'string' && v.toLowerCase().includes(q));
     });
     Object.entries(colFilters).forEach(([col, vals]) => {
-      if (!vals || vals.size === 0) return;
+      if (!vals) return;
       rows = rows.filter(d => {
         const v = col === 'phone' ? cleanPhone(d.request?.phone_to_certify)
                 : col === 'coach' ? coachLabel(d.request)
@@ -381,7 +392,7 @@ export default function AgentMyGSMPage() {
     return rows;
   }, [dayDetails, detailSearch, colFilters]);
 
-  const activeFilterCount = Object.values(colFilters).filter(s => s && s.size > 0).length;
+  const activeFilterCount = Object.values(colFilters).filter(s => s !== undefined).length;
 
   // ── Sauvegarde cellule ──────────────────────────────────────────────────────
   const handleCellSave = async (reqId: string, col: keyof ProcessingDetails, newVal: string) => {
@@ -436,6 +447,29 @@ export default function AgentMyGSMPage() {
       toast.error('Impossible de supprimer cette ligne.');
     } finally {
       setDeletingRequestId(null);
+    }
+  };
+
+  const handleRemoveScreenshot = async (detail: any, screenshotUrl: string, screenshotIndex: number) => {
+    if (!detail.request_id || removingScreenshot) return;
+    const confirmed = window.confirm('Retirer uniquement cette image de capture ? Les autres captures de la ligne seront conservées.');
+    if (!confirmed) return;
+
+    const remainingUrls = (detail.screenshot_urls ?? []).filter((url: string, index: number) =>
+      index !== screenshotIndex || url !== screenshotUrl
+    );
+    setRemovingScreenshot(`${detail.request_id}-${screenshotIndex}`);
+    try {
+      await removeProcessingScreenshot(detail.request_id, screenshotUrl, remainingUrls);
+      setDayDetails(prev => prev.map(row => row.request_id === detail.request_id
+        ? { ...row, screenshot_urls: remainingUrls }
+        : row));
+      toast.success('Capture retirée.');
+    } catch (error) {
+      console.error('Screenshot removal failed', error);
+      toast.error('Impossible de retirer cette capture.');
+    } finally {
+      setRemovingScreenshot(null);
     }
   };
 
@@ -680,12 +714,27 @@ export default function AgentMyGSMPage() {
                           ))}
                           <td style={{ border: '1px solid #000', padding: '2px 5px', textAlign: 'center', minWidth: 90 }}>
                             <div className="flex flex-wrap items-center justify-center gap-1">
-                              {screenshots.map((url, si) => (
-                                <img key={si} src={url} alt={`capture ${si + 1}`}
-                                  onClick={() => setLightbox(url)}
-                                  className="w-8 h-8 object-cover rounded cursor-pointer border border-gray-300 hover:scale-110 transition-transform"
-                                  title="Cliquer pour agrandir" />
-                              ))}
+                              {screenshots.map((url, si) => {
+                                const screenshotKey = `${d.request_id}-${si}`;
+                                return (
+                                  <div key={`${url}-${si}`} className="relative group shrink-0">
+                                    <img src={url} alt={`capture ${si + 1}`}
+                                      onClick={() => setLightbox(url)}
+                                      className="w-8 h-8 object-cover rounded cursor-pointer border border-gray-300 hover:scale-110 transition-transform"
+                                      title="Cliquer pour agrandir" />
+                                    <button type="button"
+                                      onClick={event => { event.stopPropagation(); handleRemoveScreenshot(d, url, si); }}
+                                      disabled={removingScreenshot !== null}
+                                      title="Retirer cette capture"
+                                      aria-label="Retirer cette capture"
+                                      className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white shadow-sm opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-60">
+                                      {removingScreenshot === screenshotKey
+                                        ? <span className="h-2.5 w-2.5 animate-spin rounded-full border border-white border-t-transparent" />
+                                        : <X size={10} />}
+                                    </button>
+                                  </div>
+                                );
+                              })}
                               <button onClick={() => triggerUpload(d.request_id)}
                                 className="w-8 h-8 flex items-center justify-center rounded border border-dashed border-gray-400 hover:border-blue-500 hover:bg-blue-50 transition-colors"
                                 title="Ajouter une capture">

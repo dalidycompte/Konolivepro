@@ -1006,6 +1006,21 @@ export async function deleteProcessingDetails(request_id: string, screenshotUrls
   if (error) throw error;
 }
 
+export async function removeProcessingScreenshot(requestId: string, screenshotUrl: string, remainingUrls: string[]) {
+  const storagePrefix = '/storage/v1/object/public/processing-screenshots/';
+  const position = screenshotUrl.indexOf(storagePrefix);
+  const path = position >= 0 ? decodeURIComponent(screenshotUrl.slice(position + storagePrefix.length)) : null;
+
+  if (path) {
+    const { error: storageError } = await supabase.storage
+      .from('processing-screenshots')
+      .remove([path]);
+    if (storageError) throw storageError;
+  }
+
+  await saveProcessingDetails({ request_id: requestId, screenshot_urls: remainingUrls } as ProcessingDetails);
+}
+
 export async function getAgentRecentProcessingDetails(agent_id: string, limit: number = 50) {
   // Filtre uniquement les enregistrements créés aujourd'hui (fuseau Africa/Brazzaville = UTC+1)
   const now = new Date();
