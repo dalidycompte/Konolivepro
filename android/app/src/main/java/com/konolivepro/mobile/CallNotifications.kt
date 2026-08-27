@@ -8,6 +8,7 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
+import android.app.Notification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.NotificationManagerCompat
@@ -59,6 +60,8 @@ object CallNotifications {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setOnlyAlertOnce(false)
+            .setSilent(false)
             .setFullScreenIntent(fullScreen, true)
             .setContentIntent(PendingIntent.getActivity(context, call.callId.hashCode() + 3, siteIntent, flags))
             .setVibrate(longArrayOf(0, 500, 250, 500))
@@ -75,7 +78,11 @@ object CallNotifications {
                 }, flags)
             builder.setStyle(NotificationCompat.CallStyle.forIncomingCall(person, decline, answer))
         }
-        NotificationManagerCompat.from(context).notify(INCOMING_ID, builder.build())
+        val notification = builder.build().apply {
+            // Maintient l’alerte visible et insistante jusqu’à l’action de l’utilisateur.
+            this.flags = this.flags or Notification.FLAG_INSISTENT
+        }
+        NotificationManagerCompat.from(context).notify(INCOMING_ID, notification)
     }
 
     fun cancelIncoming(context: Context) {

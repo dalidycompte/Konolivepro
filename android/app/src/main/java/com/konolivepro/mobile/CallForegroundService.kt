@@ -6,9 +6,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.PowerManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -23,6 +25,7 @@ import java.time.Instant
 class CallForegroundService : Service() {
     private var ringtone: Ringtone? = null
     private var vibrator: Vibrator? = null
+    private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
     private val expireRunnable = Runnable {
         stopAlerting()
@@ -89,17 +92,30 @@ class CallForegroundService : Service() {
         if (ringtone?.isPlaying == true) return
         val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        wakeLock = getSystemService(PowerManager::class.java)?.let { powerManager ->
+            @Suppress("DEPRECATION")
+            powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "com.dalidycompte.konolive:IncomingCall",
+            ).apply {
+                setReferenceCounted(false)
+                acquire(ALERT_TIMEOUT_MS)
+            }
+        }
         ringtone = RingtoneManager.getRingtone(this, ringtoneUri)?.apply {
             audioAttributes = AudioAttributes.Builder()
+                .setLegacyStreamType(AudioManager.STREAM_RING)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
             play()
         }
         vibrator = getSystemService(Vibrator::class.java)
-        val pattern = longArrayOf(0, 600, 300, 600)
+        val pattern = longArrayOf(0, 900, 250, 900, 250, 900)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+            val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, amplitudes, 0))
         } else {
             @Suppress("DEPRECATION") vibrator?.vibrate(pattern, 0)
         }
@@ -110,6 +126,8 @@ class CallForegroundService : Service() {
         ringtone?.stop()
         ringtone = null
         vibrator?.cancel()
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
     }
 
     private fun canUsePhoneCallType(): Boolean {
@@ -132,6 +150,7 @@ class CallForegroundService : Service() {
         const val EXTRA_ACTION = "service_action"
         const val ACTION_STOP = "stop_alerting"
         private const val SERVICE_ID = 7002
+        private const val ALERT_TIMEOUT_MS = 65_000L
 
         fun stopIncoming(context: android.content.Context) {
             context.stopService(Intent(context, CallForegroundService::class.java))
