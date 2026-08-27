@@ -16,7 +16,8 @@ import androidx.core.app.NotificationManagerCompat
 object CallNotifications {
     // Android conserve définitivement les réglages sonores du premier canal créé.
     // Un nouvel identifiant corrige les installations où l’ancien canal était silencieux.
-    const val CALL_CHANNEL = "konolive_calls_v2"
+    // Même identifiant de canal que l’APK de référence ; le canal entrant reste distinct du canal d’état.
+    const val CALL_CHANNEL = "konolive_call_channel"
     const val STATE_CHANNEL = "konolive_call_state"
     private const val INCOMING_ID = 7001
 
@@ -31,8 +32,9 @@ object CallNotifications {
         manager.createNotificationChannel(NotificationChannel(CALL_CHANNEL, "Appels entrants", NotificationManager.IMPORTANCE_HIGH).apply {
             description = "Appels vidéo entrants Konolive"
             enableVibration(true)
-            vibrationPattern = longArrayOf(0, 500, 250, 500)
+            vibrationPattern = longArrayOf(0, 900, 250, 900, 250, 900)
             setSound(ringtone, audio)
+            setShowBadge(false)
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         })
         manager.createNotificationChannel(NotificationChannel(STATE_CHANNEL, "État des appels", NotificationManager.IMPORTANCE_LOW))

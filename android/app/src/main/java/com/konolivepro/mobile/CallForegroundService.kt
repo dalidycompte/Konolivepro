@@ -7,15 +7,16 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.Ringtone
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
-import android.os.PowerManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import org.json.JSONObject
@@ -23,7 +24,7 @@ import java.time.Duration
 import java.time.Instant
 
 class CallForegroundService : Service() {
-    private var ringtone: Ringtone? = null
+    private var ringtonePlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
@@ -65,6 +66,8 @@ class CallForegroundService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
             .build()
         val foregroundType = when {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
@@ -82,16 +85,18 @@ class CallForegroundService : Service() {
         handler.removeCallbacks(expireRunnable)
         val delay = runCatching {
             val expiresAt = rawCall?.let { JSONObject(it).optString(EXPIRES_AT) }.orEmpty()
-            if (expiresAt.isBlank()) 60_000L
+            if (expiresAt.isBlank()) ALERT_TIMEOUT_MS
             else Duration.between(Instant.now(), Instant.parse(expiresAt)).toMillis().coerceAtLeast(1_000L)
-        }.getOrDefault(60_000L)
+        }.getOrDefault(ALERT_TIMEOUT_MS)
         handler.postDelayed(expireRunnable, delay)
     }
 
     private fun startAlerting() {
-        if (ringtone?.isPlaying == true) return
+        if (ringtonePlayer?.isPlaying == true) return
+        stopRingtone()
         val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
         wakeLock = getSystemService(PowerManager::class.java)?.let { powerManager ->
             @Suppress("DEPRECATION")
             powerManager.newWakeLock(
@@ -102,16 +107,29 @@ class CallForegroundService : Service() {
                 acquire(ALERT_TIMEOUT_MS)
             }
         }
-        ringtone = RingtoneManager.getRingtone(this, ringtoneUri)?.apply {
-            audioAttributes = AudioAttributes.Builder()
-                .setLegacyStreamType(AudioManager.STREAM_RING)
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
-            play()
+
+        ringtonePlayer = runCatching {
+            MediaPlayer.create(this, ringtoneUri)?.apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setLegacyStreamType(AudioManager.STREAM_RING)
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build(),
+                    )
+                }
+                isLooping = true
+                setVolume(1.0f, 1.0f)
+                start()
+            }
+        }.getOrNull()
+
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION") getSystemService(Vibrator::class.java)
         }
-        vibrator = getSystemService(Vibrator::class.java)
         val pattern = longArrayOf(0, 900, 250, 900, 250, 900)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
@@ -121,10 +139,17 @@ class CallForegroundService : Service() {
         }
     }
 
+    private fun stopRingtone() {
+        ringtonePlayer?.let { player ->
+            runCatching { if (player.isPlaying) player.stop() }
+            runCatching { player.release() }
+        }
+        ringtonePlayer = null
+    }
+
     private fun stopAlerting() {
         handler.removeCallbacks(expireRunnable)
-        ringtone?.stop()
-        ringtone = null
+        stopRingtone()
         vibrator?.cancel()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
