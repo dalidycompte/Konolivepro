@@ -38,3 +38,9 @@ L’application Android dispose maintenant d’un cache SQLite local pour les de
 Lorsque le site est connecté dans la WebView, `RealtimeDataSync` ouvre une souscription Supabase Realtime filtrée sur l’utilisateur courant. Un changement de demande ou de notification déclenche une synchronisation du cache local. En cas de coupure, le client se reconnecte avec un backoff progressif. Si le site ne peut pas être chargé, l’application affiche une page locale indiquant les données en cache et le nombre d’actions en attente.
 
 Cette version est un mode offline-first de l’application Android : les appels entrants restent traités immédiatement par FCM lorsqu’Android peut réveiller l’application, tandis que les données métier et actions hors connexion sont conservées localement puis synchronisées dès le retour du réseau. Comme pour toute application Android, un arrêt forcé explicite, la désactivation des notifications ou un mode d’économie d’énergie agressif peuvent empêcher le système de réveiller les processus en arrière-plan.
+
+## Permissions Android
+
+La dernière APK déclare les permissions nécessaires à l’expérience d’appel et au fonctionnement connecté : Internet, état réseau, localisation approximative et précise, superposition, notifications push, caméra, microphone, vibreur, réveil de l’écran et service au premier plan caméra/microphone. Au premier lancement, l’application demande les permissions runtime de notifications, caméra, microphone et localisation. Elle ouvre également le réglage système spécial de superposition si cette autorisation n’est pas accordée.
+
+La sonnerie ne nécessite pas une permission Android séparée : l’application utilise la sonnerie système du téléphone via `RingtoneManager` et le canal de notification d’appel haute priorité. Le vibreur est déclaré et activé pendant la sonnerie entrante, puis annulé lorsque l’appel est accepté, refusé, expiré ou terminé sur un autre appareil.

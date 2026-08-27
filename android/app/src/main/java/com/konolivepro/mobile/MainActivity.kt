@@ -12,6 +12,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
@@ -45,6 +46,18 @@ class MainActivity : ComponentActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingFcmToken: String? = null
     private var pendingWebPermission: PermissionRequest? = null
+
+    private val startupMediaPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        Log.d("KONOLIVE", "Caméra autorisée=${result[Manifest.permission.CAMERA] == true}, microphone autorisé=${result[Manifest.permission.RECORD_AUDIO] == true}")
+    }
+
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        Log.d("KONOLIVE", "Localisation autorisée=${result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true}")
+    }
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -108,6 +121,8 @@ class MainActivity : ComponentActivity() {
         OfflineSyncScheduler.syncNow(this)
         CallNotifications.createChannels(this)
         requestNotificationPermission()
+        requestCameraAndMicrophonePermission()
+        requestLocationPermission()
         pendingIncomingCall = intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON)
         configureWebView()
         registerNativeEvents()
@@ -121,6 +136,29 @@ class MainActivity : ComponentActivity() {
             addAction(ACTION_CALL_STATE)
         }
         ContextCompat.registerReceiver(this, nativeEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    private fun requestCameraAndMicrophonePermission() {
+        val cameraMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+        val microphoneMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+        if (cameraMissing || microphoneMissing) {
+            startupMediaPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+        }
+    }
+
+    private fun requestLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        ) {
+            locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+    }
+
+    private fun promptOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        }
     }
 
     private fun requestNotificationPermission() {
@@ -200,13 +238,16 @@ class MainActivity : ComponentActivity() {
             }
 
             override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
-                if (origin?.startsWith(WEBSITE_ORIGIN) == true) callback?.invoke(origin, false, false) else callback?.invoke(origin, false, false)
+                val locationGranted = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                callback?.invoke(origin, origin?.startsWith(WEBSITE_ORIGIN) == true && locationGranted, false)
             }
 
             override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean = BuildConfig.DEBUG
         }
         setContentView(FrameLayout(this).apply { addView(webView, ViewGroup.LayoutParams(-1, -1)) })
         webView.loadUrl(WEBSITE_URL)
+        webView.postDelayed({ promptOverlayPermission() }, 2_000)
     }
 
     private fun isNetworkAvailable(): Boolean {
