@@ -12,8 +12,8 @@ android {
         applicationId = "com.dalidycompte.konolive"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         buildConfigField("String", "SUPABASE_URL", "\"${project.findProperty("SUPABASE_URL") ?: "https://YOUR_PROJECT.supabase.co"}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${project.findProperty("SUPABASE_ANON_KEY") ?: "REPLACE_WITH_SUPABASE_ANON_KEY"}\"")

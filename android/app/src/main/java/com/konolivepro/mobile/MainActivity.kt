@@ -181,15 +181,6 @@ class MainActivity : ComponentActivity() {
             }
             return
         }
-        if (Build.VERSION.SDK_INT >= 34 && !NotificationManagerCompat.from(this).canUseFullScreenIntent()) {
-            if (!fullScreenSettingsOpened) {
-                fullScreenSettingsOpened = true
-                promptFullScreenIntent()
-            } else {
-                Toast.makeText(this, "Autorisez les notifications plein écran pour les appels Konolive.", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
         val cameraMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
         if (cameraMissing) {
             if (!cameraPermissionRequested) {
@@ -222,6 +213,15 @@ class MainActivity : ComponentActivity() {
             } else {
                 Toast.makeText(this, "Autorisez la localisation dans les réglages Android.", Toast.LENGTH_LONG).show()
                 openApplicationSettings()
+            }
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 34 && !NotificationManagerCompat.from(this).canUseFullScreenIntent()) {
+            if (!fullScreenSettingsOpened) {
+                fullScreenSettingsOpened = true
+                promptFullScreenIntent()
+            } else {
+                Toast.makeText(this, "Autorisez les notifications plein écran pour les appels Konolive.", Toast.LENGTH_LONG).show()
             }
             return
         }
