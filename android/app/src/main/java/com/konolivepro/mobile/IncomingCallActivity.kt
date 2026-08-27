@@ -65,6 +65,9 @@ class IncomingCallActivity : ComponentActivity() {
         if (action == CallNotifications.ACTION_ACCEPT) { accept(); return }
         if (action == CallNotifications.ACTION_REJECT) { reject(); return }
         render()
+        // Le premier écran natif est l’interface unique ; le service conserve son alerte sonore et vibratoire.
+        // La notification qui a déclenché le Full-Screen Intent ne reste pas en bandeau par-dessus l’écran.
+        CallNotifications.cancelIncoming(this)
         startAlerting()
         startExpiryTimer()
         ContextCompat.registerReceiver(this, stateReceiver, IntentFilter(ACTION_CALL_STATE), ContextCompat.RECEIVER_NOT_EXPORTED)
