@@ -30,3 +30,11 @@ Le build Android `assembleDebug` a réussi avec le fichier Firebase officiel fou
 | Taille | Environ 49 Mo |
 | SHA-256 | `9462196edffc92e62098884e463d364dd7bb9b1525d60cf041fc43e3f663aff9` |
 | Commit source | `f28e9bd4` |
+
+## Architecture offline-first
+
+L’application Android dispose maintenant d’un cache SQLite local pour les demandes et notifications, d’une file persistante d’actions à rejouer et d’un `OfflineSyncWorker` exécuté lorsque le réseau est disponible. Les synchronisations sont déclenchées au lancement, au retour de la connectivité et périodiquement avec une contrainte réseau. Les opérations sont rejouées dans l’ordre; un échec déclenche un backoff et les entrées trop anciennes sont retirées après plusieurs tentatives.
+
+Lorsque le site est connecté dans la WebView, `RealtimeDataSync` ouvre une souscription Supabase Realtime filtrée sur l’utilisateur courant. Un changement de demande ou de notification déclenche une synchronisation du cache local. En cas de coupure, le client se reconnecte avec un backoff progressif. Si le site ne peut pas être chargé, l’application affiche une page locale indiquant les données en cache et le nombre d’actions en attente.
+
+Cette version est un mode offline-first de l’application Android : les appels entrants restent traités immédiatement par FCM lorsqu’Android peut réveiller l’application, tandis que les données métier et actions hors connexion sont conservées localement puis synchronisées dès le retour du réseau. Comme pour toute application Android, un arrêt forcé explicite, la désactivation des notifications ou un mode d’économie d’énergie agressif peuvent empêcher le système de réveiller les processus en arrière-plan.

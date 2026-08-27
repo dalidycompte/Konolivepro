@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -21,6 +23,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.JavascriptInterface
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
@@ -36,6 +39,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var session: SessionStore
     private lateinit var api: SupabaseApi
+    private lateinit var offlineStore: OfflineStore
+    private var realtimeDataSync: RealtimeDataSync? = null
     private var pendingIncomingCall: String? = null
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingFcmToken: String? = null
@@ -97,6 +102,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         session = SessionStore(this)
         api = SupabaseApi(this)
+        offlineStore = OfflineStore(this)
+        OfflineSyncScheduler.install(this)
+        OfflineConnectivity.register(this)
+        OfflineSyncScheduler.syncNow(this)
         CallNotifications.createChannels(this)
         requestNotificationPermission()
         pendingIncomingCall = intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON)
@@ -136,18 +145,25 @@ class MainActivity : ComponentActivity() {
             mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(false)
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = if (isNetworkAvailable()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
             userAgentString = "$userAgentString KonoliveAndroid/${BuildConfig.VERSION_NAME}"
         }
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+        webView.addJavascriptInterface(WebAppBridge(), "AndroidOffline")
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = handleUrl(request.url)
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = handleUrl(Uri.parse(url))
             override fun onPageFinished(view: WebView, url: String) {
                 super.onPageFinished(view, url)
                 syncWebSession()
+                OfflineSyncScheduler.syncNow(this@MainActivity)
                 dispatchIncomingCall()
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+                super.onReceivedError(view, request, error)
+                if (request.isForMainFrame) view.loadUrl("file:///android_asset/offline.html")
             }
             override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
@@ -193,6 +209,27 @@ class MainActivity : ComponentActivity() {
         webView.loadUrl(WEBSITE_URL)
     }
 
+    private fun isNetworkAvailable(): Boolean {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return false
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private inner class WebAppBridge {
+        @JavascriptInterface fun isOnline(): Boolean = isNetworkAvailable()
+        @JavascriptInterface fun cachedSnapshot(): String = offlineStore.cachedJson().toString()
+        @JavascriptInterface fun pendingCount(): Int = offlineStore.outboxCount()
+        @JavascriptInterface fun retry() = runOnUiThread { webView.loadUrl(WEBSITE_URL) }
+        @JavascriptInterface fun syncNow() = OfflineSyncScheduler.syncNow(this@MainActivity)
+        @JavascriptInterface fun queueCreateRequest(phone: String): String {
+            if (phone.isBlank()) return "invalid"
+            offlineStore.enqueue(OfflineSyncWorker.OP_CREATE_REQUEST, org.json.JSONObject().put("phone", phone))
+            OfflineSyncScheduler.syncNow(this@MainActivity)
+            return "queued"
+        }
+    }
+
     private fun handleUrl(url: Uri): Boolean {
         val scheme = url.scheme.orEmpty()
         if (scheme == "http" || scheme == "https") {
@@ -232,6 +269,9 @@ class MainActivity : ComponentActivity() {
                 val value = org.json.JSONObject(sessionJson.getString("value"))
                 session.accessToken = value.optString("access_token").takeIf { it.isNotBlank() }
                 session.userId = value.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
+                if (session.accessToken != null && session.userId != null && realtimeDataSync == null) {
+                    realtimeDataSync = RealtimeDataSync(this@MainActivity, api, session.accessToken!!, session.userId!!).also { it.start() }
+                }
                 if (pendingFcmToken != null && session.accessToken != null) {
                     val token = pendingFcmToken
                     pendingFcmToken = null
@@ -261,6 +301,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(nativeEvents) }
+        realtimeDataSync?.stop()
+        realtimeDataSync = null
         if (::webView.isInitialized) {
             webView.stopLoading()
             webView.destroy()
