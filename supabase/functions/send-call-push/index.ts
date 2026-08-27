@@ -109,25 +109,16 @@ Deno.serve(async (req: Request) => {
       return Response.json({ error: 'FCM_SERVER_KEY non configurée' }, { status: 500, headers: CORS });
     }
 
+    // Legacy FCM HTTP is used because the project stores FCM_SERVER_KEY.
+    // Do not add a notification block: notification messages bypass
+    // FirebaseMessagingService while the app is backgrounded. Android creates
+    // the CallStyle/full-screen notification locally from this data payload.
     const fcmPayload = {
       registration_ids: tokens,
       priority: 'high',
-      // Data-only is intentional: the Android service creates the full-screen
-      // CallStyle notification and can cancel it on another-device events.
+      time_to_live: isInvite ? 60 : 120,
+      collapse_key: isInvite ? `konolive_call_${body.callId}` : `konolive_state_${body.callId}`,
       data,
-      android: {
-        priority: 'high',
-        notification: isInvite
-          ? {
-              channelId: 'konolive_calls',
-              sound: 'default',
-              defaultVibrateTimings: true,
-              visibility: 'PUBLIC',
-              notificationPriority: 'PRIORITY_MAX',
-            }
-          : { channelId: 'konolive_call_state', visibility: 'PRIVATE' },
-        directBootOk: true,
-      },
     };
 
     const fcmRes = await fetch('https://fcm.googleapis.com/fcm/send', {

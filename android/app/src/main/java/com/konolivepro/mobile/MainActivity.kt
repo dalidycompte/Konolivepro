@@ -12,6 +12,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import android.view.ViewGroup
@@ -157,7 +158,24 @@ class MainActivity : ComponentActivity() {
 
     private fun promptOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            runCatching {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            }
+        }
+    }
+
+    private fun isIgnoringBatteryOptimizations(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val powerManager = getSystemService(PowerManager::class.java) ?: return false
+        return powerManager.isIgnoringBatteryOptimizations(packageName)
+    }
+
+    private fun promptBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || isIgnoringBatteryOptimizations()) return
+        runCatching {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
+        }.onFailure {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
         }
     }
 
@@ -247,7 +265,10 @@ class MainActivity : ComponentActivity() {
         }
         setContentView(FrameLayout(this).apply { addView(webView, ViewGroup.LayoutParams(-1, -1)) })
         webView.loadUrl(WEBSITE_URL)
-        webView.postDelayed({ promptOverlayPermission() }, 2_000)
+        webView.postDelayed({
+            promptOverlayPermission()
+            webView.postDelayed({ promptBatteryOptimizationExemption() }, 1_500)
+        }, 2_000)
     }
 
     private fun isNetworkAvailable(): Boolean {
