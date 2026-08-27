@@ -1,6 +1,7 @@
 package com.konolivepro.mobile
 
 import android.content.Intent
+import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import org.json.JSONObject
@@ -38,6 +39,9 @@ class KonoliveMessagingService : FirebaseMessagingService() {
         if (call.callId.isBlank() || isExpired(call.expiresAt)) return
         getSharedPreferences("konolive_pending_call", MODE_PRIVATE)
             .edit().putString("call", call.toJson().toString()).apply()
+        ContextCompat.startForegroundService(this, Intent(this, CallForegroundService::class.java).apply {
+            putExtra(CallForegroundService.EXTRA_MODE, CallForegroundService.MODE_INCOMING)
+        })
         CallNotifications.showIncoming(this, call)
         sendBroadcast(Intent(ACTION_INCOMING_CALL).setPackage(packageName).putExtra(CALL_JSON, call.toJson().toString()))
     }

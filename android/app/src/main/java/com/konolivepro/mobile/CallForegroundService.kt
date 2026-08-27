@@ -13,24 +13,32 @@ class CallForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         CallNotifications.createChannels(this)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val incomingOnly = intent?.getStringExtra(EXTRA_MODE) == MODE_INCOMING
+        startForegroundFor(incomingOnly)
+        return START_NOT_STICKY
+    }
+
+    private fun startForegroundFor(incomingOnly: Boolean) {
         val notification = NotificationCompat.Builder(this, CallNotifications.STATE_CHANNEL)
             .setSmallIcon(R.drawable.ic_konolive)
-            .setContentTitle("Konolive")
-            .setContentText("Appel en cours")
+            .setContentTitle(if (incomingOnly) "Konolive" else "Konolive — Appel en cours")
+            .setContentText(if (incomingOnly) "Préparation de l’appel entrant" else "Appel en cours")
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)
             .build()
-        val foregroundType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && canUsePhoneCallType()) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-        } else {
-            0
+        val foregroundType = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
+            incomingOnly -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+            canUsePhoneCallType() -> ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceCompat.startForeground(this, 7002, notification, foregroundType)
+            ServiceCompat.startForeground(this, SERVICE_ID, notification, foregroundType)
         } else {
-            startForeground(7002, notification)
+            startForeground(SERVICE_ID, notification)
         }
     }
 
@@ -40,7 +48,11 @@ class CallForegroundService : Service() {
         return roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
-
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        const val EXTRA_MODE = "foreground_mode"
+        const val MODE_INCOMING = "incoming"
+        private const val SERVICE_ID = 7002
+    }
 }
