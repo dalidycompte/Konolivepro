@@ -47,24 +47,45 @@ class MainActivity : ComponentActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var pendingFcmToken: String? = null
     private var pendingWebPermission: PermissionRequest? = null
+    private var overlaySettingsOpened = false
+    private var batterySettingsOpened = false
+    private var permissionsReady = false
+    private var notificationPermissionRequested = false
+    private var cameraPermissionRequested = false
+    private var microphonePermissionRequested = false
+    private var locationPermissionRequested = false
 
-    private val startupMediaPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        Log.d("KONOLIVE", "Caméra autorisée=${result[Manifest.permission.CAMERA] == true}, microphone autorisé=${result[Manifest.permission.RECORD_AUDIO] == true}")
+    private val startupCameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        cameraPermissionRequested = true
+        Log.d("KONOLIVE", "Caméra autorisée=$granted")
+        startPermissionSequence()
+    }
+
+    private val startupMicrophonePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        microphonePermissionRequested = true
+        Log.d("KONOLIVE", "Microphone autorisé=$granted")
+        startPermissionSequence()
     }
 
     private val locationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
+        locationPermissionRequested = true
         Log.d("KONOLIVE", "Localisation autorisée=${result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true}")
+        startPermissionSequence()
     }
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        notificationPermissionRequested = true
         if (granted) Log.d("KONOLIVE", "Notifications autorisées")
         else Log.d("KONOLIVE", "Notifications refusées")
+        startPermissionSequence()
     }
 
     private val mediaPermissionLauncher = registerForActivityResult(
@@ -121,13 +142,8 @@ class MainActivity : ComponentActivity() {
         OfflineConnectivity.register(this)
         OfflineSyncScheduler.syncNow(this)
         CallNotifications.createChannels(this)
-        requestNotificationPermission()
-        requestCameraAndMicrophonePermission()
-        requestLocationPermission()
         pendingIncomingCall = intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON)
-        configureWebView()
-        registerNativeEvents()
-        requestFcmToken()
+        startPermissionSequence()
     }
 
     private fun registerNativeEvents() {
@@ -139,21 +155,81 @@ class MainActivity : ComponentActivity() {
         ContextCompat.registerReceiver(this, nativeEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
     }
 
-    private fun requestCameraAndMicrophonePermission() {
-        val cameraMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
-        val microphoneMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
-        if (cameraMissing || microphoneMissing) {
-            startupMediaPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+    private fun startPermissionSequence() {
+        if (permissionsReady) return
+        val notificationMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (notificationMissing) {
+            if (!notificationPermissionRequested) {
+                notificationPermissionRequested = true
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                Toast.makeText(this, "Autorisez les notifications dans les réglages Android.", Toast.LENGTH_LONG).show()
+                openApplicationSettings()
+            }
+            return
         }
-    }
-
-    private fun requestLocationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+        val cameraMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+        if (cameraMissing) {
+            if (!cameraPermissionRequested) {
+                cameraPermissionRequested = true
+                startupCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            } else {
+                Toast.makeText(this, "Autorisez la caméra dans les réglages Android.", Toast.LENGTH_LONG).show()
+                openApplicationSettings()
+            }
+            return
+        }
+        val microphoneMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+        if (microphoneMissing) {
+            if (!microphonePermissionRequested) {
+                microphonePermissionRequested = true
+                startupMicrophonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                Toast.makeText(this, "Autorisez le microphone dans les réglages Android.", Toast.LENGTH_LONG).show()
+                openApplicationSettings()
+            }
+            return
+        }
+        val locationMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-        ) {
-            locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        if (locationMissing) {
+            if (!locationPermissionRequested) {
+                locationPermissionRequested = true
+                locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+            } else {
+                Toast.makeText(this, "Autorisez la localisation dans les réglages Android.", Toast.LENGTH_LONG).show()
+                openApplicationSettings()
+            }
+            return
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            if (!overlaySettingsOpened) {
+                overlaySettingsOpened = true
+                promptOverlayPermission()
+            } else {
+                Toast.makeText(this, "Activez la superposition pour recevoir les appels en plein écran.", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
+            if (!batterySettingsOpened) {
+                batterySettingsOpened = true
+                promptBatteryOptimizationExemption()
+            } else {
+                Toast.makeText(this, "Désactivez l’optimisation batterie pour ne manquer aucun appel.", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        permissionsReady = true
+        configureWebView()
+        registerNativeEvents()
+        requestFcmToken()
+    }
+
+    private fun openApplicationSettings() {
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
     }
 
     private fun promptOverlayPermission() {
@@ -178,15 +254,6 @@ class MainActivity : ComponentActivity() {
             startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
         }
     }
-
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun configureWebView() {
@@ -265,10 +332,6 @@ class MainActivity : ComponentActivity() {
         }
         setContentView(FrameLayout(this).apply { addView(webView, ViewGroup.LayoutParams(-1, -1)) })
         webView.loadUrl(WEBSITE_URL)
-        webView.postDelayed({
-            promptOverlayPermission()
-            webView.postDelayed({ promptBatteryOptimizationExemption() }, 1_500)
-        }, 2_000)
     }
 
     private fun isNetworkAvailable(): Boolean {
@@ -349,6 +412,11 @@ class MainActivity : ComponentActivity() {
         val safe = json.replace("\\", "\\\\").replace("'", "\\'")
         val script = "window.dispatchEvent(new CustomEvent('konolive:incoming_call',{detail:JSON.parse('$safe')}));"
         webView.evaluateJavascript(script) { pendingIncomingCall = null }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!permissionsReady) startPermissionSequence()
     }
 
     override fun onBackPressed() {
