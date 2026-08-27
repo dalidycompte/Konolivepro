@@ -25,10 +25,13 @@ import java.time.Instant
 
 class CallForegroundService : Service() {
     private var ringtonePlayer: MediaPlayer? = null
+    private var pendingCall: IncomingCall? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
     private val expireRunnable = Runnable {
+        pendingCall?.let { CallNotifications.showMissed(this, it) }
+        pendingCall = null
         stopAlerting()
         CallNotifications.cancelIncoming(this)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -49,6 +52,11 @@ class CallForegroundService : Service() {
         }
 
         val incomingOnly = intent?.getStringExtra(EXTRA_MODE) == MODE_INCOMING
+        if (incomingOnly) {
+            pendingCall = runCatching {
+                intent?.getStringExtra(CallNotifications.EXTRA_CALL_JSON)?.let { IncomingCall.fromJson(JSONObject(it)) }
+            }.getOrNull()
+        }
         startForegroundFor(incomingOnly)
         if (incomingOnly) {
             scheduleExpiry(intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON))
@@ -153,6 +161,7 @@ class CallForegroundService : Service() {
         vibrator?.cancel()
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+        pendingCall = null
     }
 
     private fun canUsePhoneCallType(): Boolean {

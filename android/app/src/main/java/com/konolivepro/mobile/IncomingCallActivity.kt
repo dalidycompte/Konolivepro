@@ -199,7 +199,11 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun reject() = respondAndFinish("REJECTED")
-    private fun expire() = respondAndFinish("EXPIRED")
+    private fun expire() {
+        if (handled) return
+        CallNotifications.showMissed(this, call)
+        respondAndFinish("EXPIRED")
+    }
 
     private fun respondAndFinish(action: String) {
         if (handled) return

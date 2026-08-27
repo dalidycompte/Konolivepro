@@ -118,10 +118,6 @@ class MainActivity : ComponentActivity() {
     private val nativeEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                ACTION_INCOMING_CALL -> {
-                    pendingIncomingCall = intent.getStringExtra(CALL_JSON)
-                    dispatchIncomingCall()
-                }
                 ACTION_FCM_TOKEN -> {
                     pendingFcmToken = intent.getStringExtra(FCM_TOKEN)
                     syncWebSession()
@@ -151,7 +147,6 @@ class MainActivity : ComponentActivity() {
 
     private fun registerNativeEvents() {
         val filter = IntentFilter().apply {
-            addAction(ACTION_INCOMING_CALL)
             addAction(ACTION_FCM_TOKEN)
             addAction(ACTION_CALL_STATE)
         }

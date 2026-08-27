@@ -43,16 +43,22 @@ class KonoliveMessagingService : FirebaseMessagingService() {
             putExtra(CallForegroundService.EXTRA_MODE, CallForegroundService.MODE_INCOMING)
             putExtra(CallNotifications.EXTRA_CALL_JSON, call.toJson().toString())
         })
+        // L’écran d’appel entrant unique est natif ; ne pas transmettre l’événement à la WebView,
+        // afin d’éviter l’ouverture du second écran blanc.
         CallNotifications.showIncoming(this, call)
-        sendBroadcast(Intent(ACTION_INCOMING_CALL).setPackage(packageName).putExtra(CALL_JSON, call.toJson().toString()))
     }
 
     private fun handleCallState(data: Map<String, String>) {
         val callId = data[CALL_ID] ?: data["call_id"].orEmpty()
         if (callId.isBlank()) return
         val pending = getSharedPreferences("konolive_pending_call", MODE_PRIVATE)
-        val pendingCallId = runCatching { pending.getString("call", null)?.let { JSONObject(it).optString(CALL_ID) } }.getOrNull()
+        val rawPending = pending.getString("call", null)
+        val pendingCallId = runCatching { rawPending?.let { JSONObject(it).optString(CALL_ID) } }.getOrNull()
         if (pendingCallId == callId) {
+            val state = data[CALL_STATE] ?: data["call_state"].orEmpty()
+            if (state.equals("EXPIRED", ignoreCase = true)) {
+                runCatching { rawPending?.let { CallNotifications.showMissed(this, IncomingCall.fromJson(JSONObject(it))) } }
+            }
             pending.edit().clear().apply()
             CallNotifications.cancelIncoming(this)
             CallForegroundService.stopIncoming(this)
