@@ -31,6 +31,7 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.firebase.messaging.FirebaseMessaging
@@ -49,6 +50,8 @@ class MainActivity : ComponentActivity() {
     private var pendingWebPermission: PermissionRequest? = null
     private var overlaySettingsOpened = false
     private var batterySettingsOpened = false
+    private var fullScreenSettingsOpened = false
+    private var notificationSettingsOpened = false
     private var permissionsReady = false
     private var notificationPermissionRequested = false
     private var cameraPermissionRequested = false
@@ -169,6 +172,24 @@ class MainActivity : ComponentActivity() {
             }
             return
         }
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            if (!notificationSettingsOpened) {
+                notificationSettingsOpened = true
+                openNotificationSettings()
+            } else {
+                Toast.makeText(this, "Activez les notifications Konolive dans les réglages Android.", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 34 && !NotificationManagerCompat.from(this).canUseFullScreenIntent()) {
+            if (!fullScreenSettingsOpened) {
+                fullScreenSettingsOpened = true
+                promptFullScreenIntent()
+            } else {
+                Toast.makeText(this, "Autorisez les notifications plein écran pour les appels Konolive.", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         val cameraMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
         if (cameraMissing) {
             if (!cameraPermissionRequested) {
@@ -230,6 +251,30 @@ class MainActivity : ComponentActivity() {
 
     private fun openApplicationSettings() {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+    }
+
+    private fun openNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                putExtra(Settings.EXTRA_CHANNEL_ID, CallNotifications.CALL_CHANNEL)
+            }
+        } else {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            }
+        }
+        runCatching { startActivity(intent) }.onFailure { openApplicationSettings() }
+    }
+
+    private fun promptFullScreenIntent() {
+        if (Build.VERSION.SDK_INT < 34) return
+        val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        runCatching { startActivity(intent) }.onFailure {
+            Toast.makeText(this, "Ouvrez l’accès aux notifications plein écran dans les réglages Android.", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun promptOverlayPermission() {

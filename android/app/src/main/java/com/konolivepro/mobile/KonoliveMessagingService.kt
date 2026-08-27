@@ -41,6 +41,7 @@ class KonoliveMessagingService : FirebaseMessagingService() {
             .edit().putString("call", call.toJson().toString()).apply()
         ContextCompat.startForegroundService(this, Intent(this, CallForegroundService::class.java).apply {
             putExtra(CallForegroundService.EXTRA_MODE, CallForegroundService.MODE_INCOMING)
+            putExtra(CallNotifications.EXTRA_CALL_JSON, call.toJson().toString())
         })
         CallNotifications.showIncoming(this, call)
         sendBroadcast(Intent(ACTION_INCOMING_CALL).setPackage(packageName).putExtra(CALL_JSON, call.toJson().toString()))
@@ -54,6 +55,7 @@ class KonoliveMessagingService : FirebaseMessagingService() {
         if (pendingCallId == callId) {
             pending.edit().clear().apply()
             CallNotifications.cancelIncoming(this)
+            CallForegroundService.stopIncoming(this)
         }
         sendBroadcast(Intent(ACTION_CALL_STATE).setPackage(packageName).apply {
             putExtra(CALL_ID, callId)

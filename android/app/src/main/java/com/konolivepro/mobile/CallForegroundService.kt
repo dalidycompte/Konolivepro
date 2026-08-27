@@ -3,21 +3,53 @@ package com.konolivepro.mobile
 import android.app.Service
 import android.app.role.RoleManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
+import android.media.Ringtone
+import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import org.json.JSONObject
+import java.time.Duration
+import java.time.Instant
 
 class CallForegroundService : Service() {
+    private var ringtone: Ringtone? = null
+    private var vibrator: Vibrator? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val expireRunnable = Runnable {
+        stopAlerting()
+        CallNotifications.cancelIncoming(this)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
     override fun onCreate() {
         super.onCreate()
         CallNotifications.createChannels(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.getStringExtra(EXTRA_ACTION) == ACTION_STOP) {
+            stopAlerting()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         val incomingOnly = intent?.getStringExtra(EXTRA_MODE) == MODE_INCOMING
         startForegroundFor(incomingOnly)
+        if (incomingOnly) {
+            scheduleExpiry(intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON))
+            startAlerting()
+        }
         return START_NOT_STICKY
     }
 
@@ -25,15 +57,16 @@ class CallForegroundService : Service() {
         val notification = NotificationCompat.Builder(this, CallNotifications.STATE_CHANNEL)
             .setSmallIcon(R.drawable.ic_konolive)
             .setContentTitle(if (incomingOnly) "Konolive" else "Konolive — Appel en cours")
-            .setContentText(if (incomingOnly) "Préparation de l’appel entrant" else "Appel en cours")
+            .setContentText(if (incomingOnly) "Appel vidéo entrant" else "Appel en cours")
             .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()
         val foregroundType = when {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
-            incomingOnly -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
             canUsePhoneCallType() -> ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(this, SERVICE_ID, notification, foregroundType)
@@ -42,10 +75,53 @@ class CallForegroundService : Service() {
         }
     }
 
+    private fun scheduleExpiry(rawCall: String?) {
+        handler.removeCallbacks(expireRunnable)
+        val delay = runCatching {
+            val expiresAt = rawCall?.let { JSONObject(it).optString(EXPIRES_AT) }.orEmpty()
+            if (expiresAt.isBlank()) 60_000L
+            else Duration.between(Instant.now(), Instant.parse(expiresAt)).toMillis().coerceAtLeast(1_000L)
+        }.getOrDefault(60_000L)
+        handler.postDelayed(expireRunnable, delay)
+    }
+
+    private fun startAlerting() {
+        if (ringtone?.isPlaying == true) return
+        val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        ringtone = RingtoneManager.getRingtone(this, ringtoneUri)?.apply {
+            audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            play()
+        }
+        vibrator = getSystemService(Vibrator::class.java)
+        val pattern = longArrayOf(0, 600, 300, 600)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+        } else {
+            @Suppress("DEPRECATION") vibrator?.vibrate(pattern, 0)
+        }
+    }
+
+    private fun stopAlerting() {
+        handler.removeCallbacks(expireRunnable)
+        ringtone?.stop()
+        ringtone = null
+        vibrator?.cancel()
+    }
+
     private fun canUsePhoneCallType(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
-        val roleManager = getSystemService(RoleManager::class.java) ?: return false
-        return roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
+        val ownsCalls = checkSelfPermission("android.permission.MANAGE_OWN_CALLS") == PackageManager.PERMISSION_GRANTED
+        val roleManager = getSystemService(RoleManager::class.java)
+        return ownsCalls || (roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) == true)
+    }
+
+    override fun onDestroy() {
+        stopAlerting()
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -53,6 +129,12 @@ class CallForegroundService : Service() {
     companion object {
         const val EXTRA_MODE = "foreground_mode"
         const val MODE_INCOMING = "incoming"
+        const val EXTRA_ACTION = "service_action"
+        const val ACTION_STOP = "stop_alerting"
         private const val SERVICE_ID = 7002
+
+        fun stopIncoming(context: android.content.Context) {
+            context.stopService(Intent(context, CallForegroundService::class.java))
+        }
     }
 }

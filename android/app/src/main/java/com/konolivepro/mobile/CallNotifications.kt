@@ -13,7 +13,9 @@ import androidx.core.app.Person
 import androidx.core.app.NotificationManagerCompat
 
 object CallNotifications {
-    const val CALL_CHANNEL = "konolive_calls"
+    // Android conserve définitivement les réglages sonores du premier canal créé.
+    // Un nouvel identifiant corrige les installations où l’ancien canal était silencieux.
+    const val CALL_CHANNEL = "konolive_calls_v2"
     const val STATE_CHANNEL = "konolive_call_state"
     private const val INCOMING_ID = 7001
 
@@ -60,6 +62,8 @@ object CallNotifications {
             .setFullScreenIntent(fullScreen, true)
             .setContentIntent(PendingIntent.getActivity(context, call.callId.hashCode() + 3, siteIntent, flags))
             .setVibrate(longArrayOf(0, 500, 250, 500))
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setTimeoutAfter(60_000)
         if (Build.VERSION.SDK_INT >= 31) {
             val decline = PendingIntent.getActivity(context, call.callId.hashCode() + 1,
                 Intent(context, IncomingCallActivity::class.java).apply {

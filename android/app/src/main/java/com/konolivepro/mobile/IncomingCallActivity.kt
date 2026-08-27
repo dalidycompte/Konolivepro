@@ -7,14 +7,9 @@ import android.content.IntentFilter
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
-import android.media.AudioAttributes
-import android.media.AudioManager
-import android.media.Ringtone
-import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
-import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
 import android.view.View
@@ -37,7 +32,6 @@ import java.time.Instant
 class IncomingCallActivity : ComponentActivity() {
     private lateinit var call: IncomingCall
     private lateinit var api: SupabaseApi
-    private var ringtone: Ringtone? = null
     private var timer: CountDownTimer? = null
     private var handled = false
     private lateinit var remainingText: TextView
@@ -167,17 +161,12 @@ class IncomingCallActivity : ComponentActivity() {
     }
 
     private fun startAlerting() {
-        val manager = getSystemService(AudioManager::class.java)
-        manager?.mode = AudioManager.MODE_NORMAL
-        ringtone = RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))
-        ringtone?.audioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-        ringtone?.play()
-        val vibrator = getSystemService(Vibrator::class.java)
-        val pattern = longArrayOf(0, 600, 300, 600)
-        if (Build.VERSION.SDK_INT >= 26) vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0)) else @Suppress("DEPRECATION") vibrator?.vibrate(pattern, 0)
+        // L’alerte est jouée par le service foreground, qui reste actif même
+        // lorsque cette activité plein écran n’est pas lancée par Android 14.
+        ContextCompat.startForegroundService(this, Intent(this, CallForegroundService::class.java).apply {
+            putExtra(CallForegroundService.EXTRA_MODE, CallForegroundService.MODE_INCOMING)
+            putExtra(CallNotifications.EXTRA_CALL_JSON, call.toJson().toString())
+        })
     }
 
     private fun startExpiryTimer() {
@@ -227,8 +216,7 @@ class IncomingCallActivity : ComponentActivity() {
 
     private fun stopAlerting() {
         timer?.cancel()
-        ringtone?.stop()
-        getSystemService(Vibrator::class.java)?.cancel()
+        CallForegroundService.stopIncoming(this)
     }
 
     override fun onDestroy() {
