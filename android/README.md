@@ -6,7 +6,7 @@ Cette application Kotlin n’est pas une WebView. Elle utilise l’API Supabase 
 
 1. Installer Android Studio avec le SDK Android 35 et Java 17.
 2. Copier `gradle.properties.example` vers `gradle.properties` si nécessaire, puis renseigner `SUPABASE_URL` et `SUPABASE_ANON_KEY` dans les propriétés Gradle locales. Ne jamais publier la clé de service Supabase dans l’application.
-3. Créer une application Android Firebase dont le package est `com.konolivepro.mobile`, télécharger `google-services.json` et le placer dans `android/app/`. Ce fichier n’est pas inclus dans Git pour éviter d’exposer la configuration Firebase du projet.
+3. Créer une application Android Firebase dont le package est `com.dalidycompte.konolive`, télécharger `google-services.json` et le placer dans `android/app/`. Ce fichier n’est pas inclus dans Git pour éviter d’exposer la configuration Firebase du projet.
 4. Appliquer la migration `supabase/migrations/00029_native_android_call_reliability.sql` et déployer la fonction `supabase/functions/send-call-push`.
 5. Configurer le secret serveur `FCM_SERVER_KEY` dans l’environnement de la fonction Edge. Le client Android ne doit jamais recevoir cette clé.
 6. Configurer un serveur TURN de production. Les serveurs STUN intégrés ne suffisent pas pour tous les réseaux mobiles et NAT stricts; les paramètres TURN devront être ajoutés dans `CallActivity.kt` avant la mise en production.
@@ -37,7 +37,7 @@ L’écran principal est désormais rendu nativement en Kotlin : il ne s’agit 
 
 Les permissions caméra et microphone sont demandées uniquement au moment d’entrer dans un appel. La localisation est optionnelle et n’est demandée que depuis l’action dédiée de l’écran principal. Les appels entrants utilisent une notification d’appel plein écran et les actions natives Accepter/Refuser; aucune permission de superposition ou d’exemption permanente de batterie n’est requise.
 
-Le package Android de production est `com.konolivepro.mobile`. Le fichier `google-services.json` reste obligatoire pour recevoir les messages FCM et doit être fourni par le projet Firebase correspondant à ce package. La clé Supabase embarquée doit être exclusivement la clé anon publique; aucune clé service ne doit être compilée dans l’APK.
+Le package Android de production est `com.dalidycompte.konolive`. Le fichier `google-services.json` reste obligatoire pour recevoir les messages FCM et doit être fourni par le projet Firebase correspondant à ce package. La clé Supabase embarquée doit être exclusivement la clé anon publique; aucune clé service ne doit être compilée dans l’APK.
 
 Le navigateur et Android partagent le canal Realtime `call-<callId>` et les événements `ready`, `offer`, `answer`, `ice_candidate` et `call_end`. La machine d’état SQL et la RPC `respond_to_mobile_video_call` restent la source de vérité afin que l’acceptation, le refus, l’expiration et le raccrochage soient atomiques pour les deux plateformes.
 
