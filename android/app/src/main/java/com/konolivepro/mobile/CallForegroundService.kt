@@ -1,9 +1,7 @@
 package com.konolivepro.mobile
 
 import android.app.Service
-import android.app.role.RoleManager
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -79,8 +77,8 @@ class CallForegroundService : Service() {
             .build()
         val foregroundType = when {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q -> 0
-            canUsePhoneCallType() -> ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+            incomingOnly -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+            else -> ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(this, SERVICE_ID, notification, foregroundType)
@@ -109,7 +107,7 @@ class CallForegroundService : Service() {
             @Suppress("DEPRECATION")
             powerManager.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "com.dalidycompte.konolive:IncomingCall",
+                "com.konolivepro.mobile:IncomingCall",
             ).apply {
                 setReferenceCounted(false)
                 acquire(ALERT_TIMEOUT_MS)
@@ -162,13 +160,6 @@ class CallForegroundService : Service() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
         pendingCall = null
-    }
-
-    private fun canUsePhoneCallType(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
-        val ownsCalls = checkSelfPermission("android.permission.MANAGE_OWN_CALLS") == PackageManager.PERMISSION_GRANTED
-        val roleManager = getSystemService(RoleManager::class.java)
-        return ownsCalls || (roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) == true)
     }
 
     override fun onDestroy() {

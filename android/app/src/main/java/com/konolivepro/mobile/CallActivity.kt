@@ -187,6 +187,13 @@ class CallActivity : ComponentActivity() {
 
     private fun handleSignal(event: String, payload: JSONObject) {
         when (event) {
+            "answer" -> lifecycleScope.launch {
+                val sdp = payload.optJSONObject("sdp") ?: return@launch
+                val description = SessionDescription(SessionDescription.Type.ANSWER, sdp.optString("sdp"))
+                peer?.setRemoteDescription(SimpleSdpObserver(), description)
+                pendingCandidates.forEach { peer?.addIceCandidate(it) }
+                pendingCandidates.clear()
+            }
             "offer" -> lifecycleScope.launch {
                 val sdp = payload.optJSONObject("sdp") ?: return@launch
                 val description = SessionDescription(SessionDescription.Type.OFFER, sdp.optString("sdp"))

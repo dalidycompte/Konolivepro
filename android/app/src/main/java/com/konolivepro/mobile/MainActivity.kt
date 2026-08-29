@@ -1,490 +1,175 @@
 package com.konolivepro.mobile
 
 import android.Manifest
-import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
-import android.content.Context
+import android.app.NotificationManager
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.net.Uri
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
-import android.util.Log
-import android.view.ViewGroup
-import android.webkit.ConsoleMessage
-import android.webkit.CookieManager
-import android.webkit.GeolocationPermissions
-import android.webkit.PermissionRequest
-import android.webkit.ValueCallback
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.JavascriptInterface
-import android.webkit.WebViewClient
-import android.widget.FrameLayout
+import android.view.Gravity
+import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
-import org.json.JSONTokener
 
 class MainActivity : ComponentActivity() {
-    private lateinit var webView: WebView
     private lateinit var session: SessionStore
     private lateinit var api: SupabaseApi
-    private lateinit var offlineStore: OfflineStore
-    private var realtimeDataSync: RealtimeDataSync? = null
-    private var pendingIncomingCall: String? = null
-    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
-    private var pendingFcmToken: String? = null
-    private var pendingWebPermission: PermissionRequest? = null
-    private var overlaySettingsOpened = false
-    private var batterySettingsOpened = false
-    private var fullScreenSettingsOpened = false
-    private var notificationSettingsOpened = false
-    private var permissionsReady = false
-    private var notificationPermissionRequested = false
-    private var cameraPermissionRequested = false
-    private var microphonePermissionRequested = false
-    private var locationPermissionRequested = false
+    private lateinit var root: LinearLayout
+    private lateinit var status: TextView
+    private var fcmToken: String? = null
 
-    private val startupCameraPermissionLauncher = registerForActivityResult(
+    private val notificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        cameraPermissionRequested = true
-        Log.d("KONOLIVE", "Caméra autorisée=$granted")
-        startPermissionSequence()
-    }
+    ) { showHomeIfAuthenticated() }
 
-    private val startupMicrophonePermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        microphonePermissionRequested = true
-        Log.d("KONOLIVE", "Microphone autorisé=$granted")
-        startPermissionSequence()
-    }
-
-    private val locationPermissionLauncher = registerForActivityResult(
+    private val locationPermission = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        locationPermissionRequested = true
-        Log.d("KONOLIVE", "Localisation autorisée=${result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true}")
-        startPermissionSequence()
-    }
-
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
     ) { granted ->
-        notificationPermissionRequested = true
-        if (granted) Log.d("KONOLIVE", "Notifications autorisées")
-        else Log.d("KONOLIVE", "Notifications refusées")
-        startPermissionSequence()
-    }
-
-    private val mediaPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        val request = pendingWebPermission ?: return@registerForActivityResult
-        val allowed = result[Manifest.permission.CAMERA] == true && result[Manifest.permission.RECORD_AUDIO] == true
-        if (allowed) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE, PermissionRequest.RESOURCE_VIDEO_CAPTURE)) else request.deny()
-        pendingWebPermission = null
-    }
-
-    private val filePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val callback = fileChooserCallback ?: return@registerForActivityResult
-        val uris = if (result.resultCode == RESULT_OK) {
-            val data = result.data
-            val clip = data?.clipData
-            when {
-                clip != null -> Array(clip.itemCount) { index -> clip.getItemAt(index).uri }
-                data?.data != null -> arrayOf(data.data!!)
-                else -> null
-            }
-        } else null
-        callback.onReceiveValue(uris)
-        fileChooserCallback = null
-    }
-
-    private val nativeEvents = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                ACTION_FCM_TOKEN -> {
-                    pendingFcmToken = intent.getStringExtra(FCM_TOKEN)
-                    syncWebSession()
-                }
-                ACTION_CALL_STATE -> {
-                    val callId = intent.getStringExtra(CALL_ID).orEmpty()
-                    val state = intent.getStringExtra(CALL_STATE).orEmpty()
-                    val payload = "{\"call_id\":${js(callId)},\"state\":${js(state)}}"
-                    runCatching { webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('konolive:call_state',{detail:$payload}));", null) }
-                }
-            }
-        }
+        val allowed = granted[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            granted[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        Toast.makeText(this, if (allowed) "Localisation autorisée" else "Localisation non autorisée", Toast.LENGTH_SHORT).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         session = SessionStore(this)
         api = SupabaseApi(this)
-        offlineStore = OfflineStore(this)
-        OfflineSyncScheduler.install(this)
-        OfflineConnectivity.register(this)
-        OfflineSyncScheduler.syncNow(this)
         CallNotifications.createChannels(this)
-        pendingIncomingCall = intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON)
-        startPermissionSequence()
-    }
-
-    private fun registerNativeEvents() {
-        val filter = IntentFilter().apply {
-            addAction(ACTION_FCM_TOKEN)
-            addAction(ACTION_CALL_STATE)
-        }
-        ContextCompat.registerReceiver(this, nativeEvents, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-    }
-
-    private fun startPermissionSequence() {
-        if (permissionsReady) return
-        val notificationMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        if (notificationMissing) {
-            if (!notificationPermissionRequested) {
-                notificationPermissionRequested = true
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                Toast.makeText(this, "Autorisez les notifications dans les réglages Android.", Toast.LENGTH_LONG).show()
-                openApplicationSettings()
-            }
-            return
-        }
-        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
-            if (!notificationSettingsOpened) {
-                notificationSettingsOpened = true
-                openNotificationSettings()
-            } else {
-                Toast.makeText(this, "Activez les notifications Konolive dans les réglages Android.", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        val cameraMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
-        if (cameraMissing) {
-            if (!cameraPermissionRequested) {
-                cameraPermissionRequested = true
-                startupCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            } else {
-                Toast.makeText(this, "Autorisez la caméra dans les réglages Android.", Toast.LENGTH_LONG).show()
-                openApplicationSettings()
-            }
-            return
-        }
-        val microphoneMissing = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
-        if (microphoneMissing) {
-            if (!microphonePermissionRequested) {
-                microphonePermissionRequested = true
-                startupMicrophonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            } else {
-                Toast.makeText(this, "Autorisez le microphone dans les réglages Android.", Toast.LENGTH_LONG).show()
-                openApplicationSettings()
-            }
-            return
-        }
-        val locationMissing = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
-        if (locationMissing) {
-            if (!locationPermissionRequested) {
-                locationPermissionRequested = true
-                locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-            } else {
-                Toast.makeText(this, "Autorisez la localisation dans les réglages Android.", Toast.LENGTH_LONG).show()
-                openApplicationSettings()
-            }
-            return
-        }
-        if (Build.VERSION.SDK_INT >= 34 && !NotificationManagerCompat.from(this).canUseFullScreenIntent()) {
-            if (!fullScreenSettingsOpened) {
-                fullScreenSettingsOpened = true
-                promptFullScreenIntent()
-            } else {
-                Toast.makeText(this, "Autorisez les notifications plein écran pour les appels Konolive.", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            if (!overlaySettingsOpened) {
-                overlaySettingsOpened = true
-                promptOverlayPermission()
-            } else {
-                Toast.makeText(this, "Activez la superposition pour recevoir les appels en plein écran.", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !isIgnoringBatteryOptimizations()) {
-            if (!batterySettingsOpened) {
-                batterySettingsOpened = true
-                promptBatteryOptimizationExemption()
-            } else {
-                Toast.makeText(this, "Désactivez l’optimisation batterie pour ne manquer aucun appel.", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        permissionsReady = true
-        configureWebView()
-        registerNativeEvents()
-        requestFcmToken()
-    }
-
-    private fun openApplicationSettings() {
-        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-    }
-
-    private fun openNotificationSettings() {
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-                putExtra(Settings.EXTRA_CHANNEL_ID, CallNotifications.CALL_CHANNEL)
-            }
-        } else {
-            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-            }
-        }
-        runCatching { startActivity(intent) }.onFailure { openApplicationSettings() }
-    }
-
-    private fun promptFullScreenIntent() {
-        if (Build.VERSION.SDK_INT < 34) return
-        val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
-            data = Uri.parse("package:$packageName")
-        }
-        runCatching { startActivity(intent) }.onFailure {
-            Toast.makeText(this, "Ouvrez l’accès aux notifications plein écran dans les réglages Android.", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun promptOverlayPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            runCatching {
-                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
-            }
-        }
-    }
-
-    private fun isIgnoringBatteryOptimizations(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
-        val powerManager = getSystemService(PowerManager::class.java) ?: return false
-        return powerManager.isIgnoringBatteryOptimizations(packageName)
-    }
-
-    private fun promptBatteryOptimizationExemption() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || isIgnoringBatteryOptimizations()) return
-        runCatching {
-            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
-        }.onFailure {
-            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-        }
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun configureWebView() {
-        webView = WebView(this)
-        webView.setBackgroundColor(AppStyle.background)
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-            allowFileAccess = false
-            allowContentAccess = true
-            mediaPlaybackRequiresUserGesture = false
-            javaScriptCanOpenWindowsAutomatically = false
-            setSupportMultipleWindows(false)
-            cacheMode = if (isNetworkAvailable()) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
-            userAgentString = "$userAgentString KonoliveAndroid/${BuildConfig.VERSION_NAME}"
-        }
-        CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
-        webView.addJavascriptInterface(WebAppBridge(), "AndroidOffline")
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = handleUrl(request.url)
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = handleUrl(Uri.parse(url))
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                syncWebSession()
-                OfflineSyncScheduler.syncNow(this@MainActivity)
-                dispatchIncomingCall()
-            }
-
-            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
-                super.onReceivedError(view, request, error)
-                if (request.isForMainFrame) view.loadUrl("file:///android_asset/offline.html")
-            }
-            override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
-                super.doUpdateVisitedHistory(view, url, isReload)
-                syncWebSession()
-            }
-        }
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
-                fileChooserCallback?.onReceiveValue(null)
-                fileChooserCallback = callback
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "image/*"
-                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                }
-                filePicker.launch(intent)
-                return true
-            }
-
-            override fun onPermissionRequest(request: PermissionRequest) {
-                runOnUiThread {
-                    if (request.origin.host != WEBSITE_HOST) { request.deny(); return@runOnUiThread }
-                    val needsMedia = request.resources.any { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE || it == PermissionRequest.RESOURCE_VIDEO_CAPTURE }
-                    if (!needsMedia) { request.deny(); return@runOnUiThread }
-                    val cameraGranted = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                    val micGranted = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-                    if (cameraGranted && micGranted) {
-                        request.grant(request.resources.filter { it == PermissionRequest.RESOURCE_AUDIO_CAPTURE || it == PermissionRequest.RESOURCE_VIDEO_CAPTURE }.toTypedArray())
-                    } else {
-                        pendingWebPermission = request
-                        mediaPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
-                    }
-                }
-            }
-
-            override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
-                val locationGranted = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                callback?.invoke(origin, origin?.startsWith(WEBSITE_ORIGIN) == true && locationGranted, false)
-            }
-
-            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean = BuildConfig.DEBUG
-        }
-        setContentView(FrameLayout(this).apply { addView(webView, ViewGroup.LayoutParams(-1, -1)) })
-        webView.loadUrl(WEBSITE_URL)
-    }
-
-    private fun isNetworkAvailable(): Boolean {
-        val manager = getSystemService(ConnectivityManager::class.java) ?: return false
-        val network = manager.activeNetwork ?: return false
-        val capabilities = manager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    }
-
-    private inner class WebAppBridge {
-        @JavascriptInterface fun isOnline(): Boolean = isNetworkAvailable()
-        @JavascriptInterface fun cachedSnapshot(): String = offlineStore.cachedJson().toString()
-        @JavascriptInterface fun pendingCount(): Int = offlineStore.outboxCount()
-        @JavascriptInterface fun retry() = runOnUiThread { webView.loadUrl(WEBSITE_URL) }
-        @JavascriptInterface fun syncNow() = OfflineSyncScheduler.syncNow(this@MainActivity)
-        @JavascriptInterface fun queueCreateRequest(phone: String): String {
-            if (phone.isBlank()) return "invalid"
-            offlineStore.enqueue(OfflineSyncWorker.OP_CREATE_REQUEST, org.json.JSONObject().put("phone", phone))
-            OfflineSyncScheduler.syncNow(this@MainActivity)
-            return "queued"
-        }
-    }
-
-    private fun handleUrl(url: Uri): Boolean {
-        val scheme = url.scheme.orEmpty()
-        if (scheme == "http" || scheme == "https") {
-            if (url.host == WEBSITE_HOST) return false
-            startActivity(Intent(Intent.ACTION_VIEW, url))
-            return true
-        }
-        if (scheme == "mailto" || scheme == "tel") {
-            startActivity(Intent(Intent.ACTION_VIEW, url))
-            return true
-        }
-        return true
-    }
-
-    private fun requestFcmToken() {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                pendingFcmToken = task.result
-                syncWebSession()
-            }
-        }
-    }
-
-    private fun syncWebSession() {
-        if (!::webView.isInitialized) return
-        val script = """
-            (function(){
-              var item = Object.entries(localStorage).find(function(entry){ return entry[0].indexOf('auth-token') >= 0; });
-              return item ? JSON.stringify({key:item[0],value:item[1]}) : '';
-            })();
-        """.trimIndent()
-        webView.evaluateJavascript(script) { rawResult ->
-            val raw = runCatching { JSONTokener(rawResult).nextValue() as? String }.getOrNull().orEmpty()
-            if (raw.isBlank()) return@evaluateJavascript
-            runCatching {
-                val sessionJson = org.json.JSONObject(raw)
-                val value = org.json.JSONObject(sessionJson.getString("value"))
-                session.accessToken = value.optString("access_token").takeIf { it.isNotBlank() }
-                session.userId = value.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
-                if (session.accessToken != null && session.userId != null && realtimeDataSync == null) {
-                    realtimeDataSync = RealtimeDataSync(this@MainActivity, api, session.accessToken!!, session.userId!!).also { it.start() }
-                }
-                if (pendingFcmToken != null && session.accessToken != null) {
-                    val token = pendingFcmToken
-                    pendingFcmToken = null
-                    lifecycleScope.launch { runCatching { api.registerDevice(token!!, BuildConfig.VERSION_NAME) } }
-                }
-            }
-        }
-    }
-
-    private fun dispatchIncomingCall() {
-        val json = pendingIncomingCall ?: return
-        if (!::webView.isInitialized) return
-        val safe = json.replace("\\", "\\\\").replace("'", "\\'")
-        val script = "window.dispatchEvent(new CustomEvent('konolive:incoming_call',{detail:JSON.parse('$safe')}));"
-        webView.evaluateJavascript(script) { pendingIncomingCall = null }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (!permissionsReady) startPermissionSequence()
-    }
-
-    override fun onBackPressed() {
-        if (::webView.isInitialized && webView.canGoBack()) webView.goBack() else super.onBackPressed()
+        handleIncomingIntent(intent)
+        showHomeIfAuthenticated()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.getStringExtra(CallNotifications.EXTRA_CALL_JSON)?.let { pendingIncomingCall = it; dispatchIncomingCall() }
+        handleIncomingIntent(intent)
     }
 
-    override fun onDestroy() {
-        runCatching { unregisterReceiver(nativeEvents) }
-        realtimeDataSync?.stop()
-        realtimeDataSync = null
-        if (::webView.isInitialized) {
-            webView.stopLoading()
-            webView.destroy()
+    private fun handleIncomingIntent(intent: Intent?) {
+        val raw = intent?.getStringExtra(CallNotifications.EXTRA_CALL_JSON) ?: return
+        startActivity(Intent(this, IncomingCallActivity::class.java).putExtra(CallNotifications.EXTRA_CALL_JSON, raw))
+    }
+
+    private fun showHomeIfAuthenticated() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return
         }
-        super.onDestroy()
+        if (session.accessToken.isNullOrBlank()) renderLogin() else renderHome()
     }
 
-    private fun js(value: String): String = org.json.JSONObject.quote(value)
-
-    companion object {
-        const val WEBSITE_URL = "https://dalidycompte.github.io/Konolivepro/"
-        const val WEBSITE_ORIGIN = "https://dalidycompte.github.io"
-        const val WEBSITE_HOST = "dalidycompte.github.io"
+    private fun baseLayout(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(dp(24), dp(32), dp(24), dp(24))
+        setBackgroundColor(Color.rgb(12, 15, 22))
     }
+
+    private fun renderLogin() {
+        root = baseLayout()
+        val title = TextView(this).apply {
+            text = "Konolive"
+            textSize = 34f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
+        root.addView(title, LinearLayout.LayoutParams(-1, -2))
+        root.addView(TextView(this).apply {
+            text = "Connexion sécurisée à votre espace"
+            textSize = 16f
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(8), 0, dp(28))
+        }, LinearLayout.LayoutParams(-1, -2))
+
+        val identifier = EditText(this).apply {
+            hint = "E-mail"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+        }
+        val password = EditText(this).apply {
+            hint = "Mot de passe"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setSingleLine(true)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+        }
+        root.addView(identifier, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(12) })
+        root.addView(password, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(18) })
+        val login = Button(this).apply { text = "Se connecter" }
+        root.addView(login, LinearLayout.LayoutParams(-1, dp(56)))
+        status = TextView(this).apply { setTextColor(Color.LTGRAY); setPadding(0, dp(18), 0, 0) }
+        root.addView(status, LinearLayout.LayoutParams(-1, -2))
+        login.setOnClickListener {
+            val user = identifier.text.toString().trim()
+            val pass = password.text.toString()
+            if (user.isBlank() || pass.isBlank()) { status.text = "Saisissez votre e-mail et votre mot de passe."; return@setOnClickListener }
+            login.isEnabled = false
+            status.text = "Connexion…"
+            lifecycleScope.launch {
+                runCatching { api.login(user, pass) }
+                    .onSuccess { registerPushAndShowHome() }
+                    .onFailure { login.isEnabled = true; status.text = "Connexion impossible : ${it.message ?: "réessayez"}" }
+            }
+        }
+        setContentView(ScrollView(this).apply { addView(root) })
+    }
+
+    private fun renderHome() {
+        root = baseLayout()
+        root.addView(TextView(this).apply {
+            text = "Konolive"
+            textSize = 30f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(-1, -2))
+        status = TextView(this).apply {
+            text = "Vous êtes connecté. Les appels entrants peuvent être reçus en arrière-plan."
+            textSize = 16f
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(16), 0, dp(24))
+        }
+        root.addView(status, LinearLayout.LayoutParams(-1, -2))
+        val location = Button(this).apply { text = "Autoriser la localisation" }
+        root.addView(location, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(12) })
+        location.setOnClickListener {
+            locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        }
+        val logout = Button(this).apply { text = "Se déconnecter" }
+        root.addView(logout, LinearLayout.LayoutParams(-1, dp(52)))
+        logout.setOnClickListener { lifecycleScope.launch { runCatching { api.revokeDevice() }; session.clear(); renderLogin() } }
+        setContentView(ScrollView(this).apply { addView(root) })
+        registerPushAndSync()
+    }
+
+    private fun registerPushAndShowHome() {
+        renderHome()
+        registerPushAndSync()
+    }
+
+    private fun registerPushAndSync() {
+        if (session.accessToken.isNullOrBlank()) return
+        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+            fcmToken = token
+            lifecycleScope.launch { runCatching { api.registerDevice(token, BuildConfig.VERSION_NAME) } }
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

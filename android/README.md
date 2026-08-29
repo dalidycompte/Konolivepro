@@ -30,3 +30,15 @@ L’application demande uniquement les permissions nécessaires : notifications,
 ## Vérification avant publication
 
 Tester au minimum l’application ouverte, en arrière-plan, fermée et avec écran verrouillé; l’acceptation et le refus sur deux appareils; l’expiration; le raccrochage par l’agent; la perte de réseau; les permissions refusées; et les appareils Samsung, Xiaomi, Tecno et Infinix. Les réglages d’économie d’énergie de certains fabricants doivent être expliqués à l’utilisateur sans contourner les protections Android.
+
+## Architecture native
+
+L’écran principal est désormais rendu nativement en Kotlin : il ne s’agit pas d’une WebView. L’application utilise directement le client REST Supabase, Firebase Cloud Messaging et le WebSocket Supabase Realtime. La WebView historique n’est plus nécessaire au parcours Android.
+
+Les permissions caméra et microphone sont demandées uniquement au moment d’entrer dans un appel. La localisation est optionnelle et n’est demandée que depuis l’action dédiée de l’écran principal. Les appels entrants utilisent une notification d’appel plein écran et les actions natives Accepter/Refuser; aucune permission de superposition ou d’exemption permanente de batterie n’est requise.
+
+Le package Android de production est `com.konolivepro.mobile`. Le fichier `google-services.json` reste obligatoire pour recevoir les messages FCM et doit être fourni par le projet Firebase correspondant à ce package. La clé Supabase embarquée doit être exclusivement la clé anon publique; aucune clé service ne doit être compilée dans l’APK.
+
+Le navigateur et Android partagent le canal Realtime `call-<callId>` et les événements `ready`, `offer`, `answer`, `ice_candidate` et `call_end`. La machine d’état SQL et la RPC `respond_to_mobile_video_call` restent la source de vérité afin que l’acceptation, le refus, l’expiration et le raccrochage soient atomiques pour les deux plateformes.
+
+Pour la production, renseigner des serveurs TURN authentifiés dans la configuration WebRTC de `CallActivity.kt`. Les serveurs STUN seuls ne garantissent pas la connectivité sur les réseaux mobiles restrictifs.
