@@ -127,6 +127,65 @@ class SupabaseApi(context: Context) {
         return rows.optJSONObject(0)?.optString("username")?.takeIf { it.isNotBlank() }
     }
 
+    suspend fun getCurrentProfile(): JSONObject? {
+        val userId = store.userId ?: return null
+        val encoded = android.net.Uri.encode(userId)
+        val rows = JSONArray(execute(requestBuilder("$baseUrl/rest/v1/profiles?id=eq.$encoded&select=*").get().build()))
+        return rows.optJSONObject(0)
+    }
+
+    suspend fun getRequestsForCurrentUser(): List<JSONObject> {
+        val userId = store.userId ?: return emptyList()
+        val encoded = android.net.Uri.encode(userId)
+        val url = "$baseUrl/rest/v1/verification_requests?or=(applicant_id.eq.$encoded,agent_id.eq.$encoded)&select=*&order=created_at.desc&limit=100"
+        return jsonObjects(execute(requestBuilder(url).get().build()))
+    }
+
+    suspend fun getAllRequestsJson(limit: Int = 100): List<JSONObject> {
+        val url = "$baseUrl/rest/v1/verification_requests?select=*&order=created_at.desc&limit=$limit"
+        return jsonObjects(execute(requestBuilder(url).get().build()))
+    }
+
+    suspend fun getMessagesJson(requestId: String): List<JSONObject> {
+        val encoded = android.net.Uri.encode(requestId)
+        val url = "$baseUrl/rest/v1/messages?request_id=eq.$encoded&select=*&order=created_at.asc&limit=100"
+        return jsonObjects(execute(requestBuilder(url).get().build()))
+    }
+
+    suspend fun sendMessageJson(requestId: String, receiverId: String, content: String) {
+        val body = JSONObject().put("request_id", requestId).put("sender_id", store.userId).put("receiver_id", receiverId).put("content", content)
+        execute(requestBuilder("$baseUrl/rest/v1/messages").post(body.toString().toRequestBody(jsonType)).build())
+    }
+
+    suspend fun updateProfileJson(updates: JSONObject) {
+        val userId = store.userId ?: return
+        val encoded = android.net.Uri.encode(userId)
+        execute(requestBuilder("$baseUrl/rest/v1/profiles?id=eq.$encoded").patch(updates.toString().toRequestBody(jsonType)).build())
+    }
+
+    suspend fun updateRequestJson(requestId: String, updates: JSONObject) {
+        val encoded = android.net.Uri.encode(requestId)
+        execute(requestBuilder("$baseUrl/rest/v1/verification_requests?id=eq.$encoded").patch(updates.toString().toRequestBody(jsonType)).build())
+    }
+
+    suspend fun claimRequestJson(requestId: String) {
+        val body = JSONObject().put("p_request_id", requestId).put("p_agent_id", store.userId)
+        execute(requestBuilder("$baseUrl/rest/v1/rpc/claim_request").post(body.toString().toRequestBody(jsonType)).build())
+    }
+
+    suspend fun getUsersJson(limit: Int = 200): List<JSONObject> {
+        return jsonObjects(execute(requestBuilder("$baseUrl/rest/v1/profiles?select=*&order=created_at.desc&limit=$limit").get().build()))
+    }
+
+    suspend fun getDailyStatsJson(): List<JSONObject> {
+        return jsonObjects(execute(requestBuilder("$baseUrl/rest/v1/rpc/get_daily_performances").post("{}".toRequestBody(jsonType)).build()))
+    }
+
+    private fun jsonObjects(raw: String): List<JSONObject> {
+        val rows = JSONArray(raw)
+        return (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
+    }
+
     fun realtimeWebSocketUrl(): String = baseUrl
         .replaceFirst("https://", "wss://")
         .replaceFirst("http://", "ws://") + "/realtime/v1/websocket?apikey=$anonKey&vsn=1.0.0"
