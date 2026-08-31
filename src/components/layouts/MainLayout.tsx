@@ -343,6 +343,34 @@ export default function MainLayout({ children, hideSidebar }: { children: React.
   // ── Expiration automatique de session par inactivité ──────────────────
   useSessionTimeout(role);
 
+  // ── Synchronisation globale des tableaux métier ───────────────────────────
+  // Les pages conservent leurs abonnements ciblés pour les mises à jour fines ;
+  // ce canal garantit qu’une mutation sur une autre vue recharge aussi le tableau
+  // actuellement affiché, sans nécessiter de bouton Actualiser.
+  useEffect(() => {
+    if (!profile) return;
+    const tables = [
+      'verification_requests', 'request_documents', 'messages', 'internal_messages',
+      'notifications', 'activity_logs', 'video_calls', 'video_call_states',
+      'processing_details', 'drafts', 'pause_sessions', 'work_period_history',
+      'processing_options', 'app_settings', 'api_integrations', 'api_integration_logs',
+    ] as const;
+    let refreshTimer: number | undefined;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => window.location.reload(), 650);
+    };
+    const channel = supabase.channel(`global-table-sync-${profile.id}-${Math.random()}`);
+    tables.forEach(table => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleRefresh);
+    });
+    channel.subscribe();
+    return () => {
+      window.clearTimeout(refreshTimer);
+      supabase.removeChannel(channel).catch(err => console.warn('Erreur de synchronisation globale:', err));
+    };
+  }, [profile?.id]);
+
   // ── Global incoming INTERNAL call listener (agent & supervisor) ──────────
   // Runs on every page — receives call_invite regardless of current route
   const [globalInternalCall, setGlobalInternalCall] = useState<{
