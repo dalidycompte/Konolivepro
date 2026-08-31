@@ -3,11 +3,11 @@ import { useParams } from 'react-router-dom';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVideoCall } from '@/contexts/VideoCallContext';
-import { getRequestById, resolveDocuments, createNotification } from '@/lib/api';
+import { getRequestById, resolveDocuments, createNotification, resubmitRequest } from '@/lib/api';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { supabase } from '@/lib/supabase';
 import type { VerificationRequest } from '@/types/types';
-import { Phone, FileImage, ArrowLeft, ZoomIn, X, XCircle, MoreHorizontal, PhoneCall, Send } from 'lucide-react';
+import { Phone, FileImage, ArrowLeft, ZoomIn, X, XCircle, MoreHorizontal, PhoneCall, Send, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ export default function RequestDetailPage() {
   const [recallReason, setRecallReason] = useState('');
   const [recallSent, setRecallSent] = useState(false);
   const [recallSending, setRecallSending] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -56,6 +57,28 @@ export default function RequestDetailPage() {
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [id, profile, load, startCall, endCall]);
+
+  // ── Resoumettre une demande classée « Autre » ────────
+  async function handleResubmit() {
+    if (!request || request.status !== 'other' || resubmitting) return;
+    setResubmitting(true);
+    const { data, error } = await resubmitRequest(request.id);
+    if (error || !data) {
+      const message = error?.message?.includes('REQUEST_NOT_RESUBMITTABLE')
+        ? 'Cette demande ne peut plus être resoumise.'
+        : 'Impossible de resoumettre la demande. Veuillez réessayer.';
+      toast.error(message);
+    } else {
+      setRequest(prev => prev ? {
+        ...prev,
+        ...data,
+        status: data.status,
+      } : prev);
+      await load();
+      toast.success('Demande resoumise avec succès. Elle est de nouveau dans la file de traitement.');
+    }
+    setResubmitting(false);
+  }
 
   // ── Envoyer la demande de rappel avec raison ──────────
   async function handleSendRecall() {
@@ -235,6 +258,33 @@ export default function RequestDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {request.status === 'other' && (
+          <div className="neu-card border border-amber-400/40 bg-amber-500/5 space-y-3">
+            <div className="flex items-start gap-3">
+              <RefreshCw size={18} className="text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <h2 className="font-semibold text-foreground">Soumettre à nouveau cette demande</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Votre dossier sera remis dans la file d’attente pour un nouveau traitement.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleResubmit}
+              disabled={resubmitting}
+              className="neu-btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-sm font-semibold disabled:opacity-50"
+            >
+              {resubmitting ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <RefreshCw size={16} />
+              )}
+              Resoumettre la demande
+            </button>
           </div>
         )}
 

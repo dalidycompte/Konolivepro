@@ -2,7 +2,7 @@ import type { ProcessingOption, ProcessingDetails } from "@/types/index";
 import { supabase } from './supabase';
 import type {
   Profile, VerificationRequest, RequestDocument,
-  Message, Notification, ActivityLog, AgentStats, GlobalStats, RequestStatus
+  Message, Notification, ActivityLog, AgentStats, GlobalStats, RequestStatus, NotificationType
 } from '@/types/types';
 
 // ─── PROFILES ───────────────────────────────────────────
@@ -280,6 +280,13 @@ export async function updateRequestStatus(
  * automatic assignment is limited to one active request per agent.
  * Returns { data, error } — error.message starts with 'AGENT_BUSY' or 'REQUEST_UNAVAILABLE'.
  */
+export async function resubmitRequest(requestId: string) {
+  const { data, error } = await supabase
+    .rpc('resubmit_verification_request', { p_request_id: requestId })
+    .maybeSingle();
+  return { data: data as VerificationRequest | null, error };
+}
+
 export async function claimRequest(requestId: string, agentId: string) {
   const { data, error } = await supabase
     .rpc('claim_request', { p_request_id: requestId, p_agent_id: agentId })
@@ -342,7 +349,7 @@ export async function markAllNotificationsRead(userId: string) {
 
 export async function createNotification(payload: {
   user_id: string;
-  type: string;
+  type: NotificationType;
   title: string;
   body: string;
   request_id?: string;

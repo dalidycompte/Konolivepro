@@ -656,7 +656,13 @@ export default function ProcessRequestPage() {
       alerted10Ref.current = true;
 
       setSubmitting(decision);
-      await updateRequestStatus(request.id, decision, profile.id, reason || undefined);
+      const { error: statusError } = await updateRequestStatus(request.id, decision, profile.id, reason || undefined);
+      if (statusError) {
+        toast.error('Impossible de mettre à jour le statut de la demande.');
+        setSubmitting(null);
+        return;
+      }
+      setRequest(prev => prev ? { ...prev, status: decision, notes: reason || null, processed_at: new Date().toISOString() } : prev);
       
       const decisionLabels: Record<string, string> = {
         accepted: 'acceptée', rejected: 'rejetée', unchanged: 'inchangée', other: 'classée Autre',
@@ -699,7 +705,13 @@ export default function ProcessRequestPage() {
     // Mettre à jour le statut uniquement si ce n'est pas déjà fait (inchangé, autre)
     if (decision !== 'accepted' && decision !== 'rejected') {
       setSubmitting(decision);
-      await updateRequestStatus(request.id, decision, profile.id, reason || undefined);
+      const { error: statusError } = await updateRequestStatus(request.id, decision, profile.id, reason || undefined);
+      if (statusError) {
+        toast.error('Impossible de mettre à jour le statut de la demande.');
+        setSubmitting(null);
+        return;
+      }
+      setRequest(prev => prev ? { ...prev, status: decision, notes: reason || null, processed_at: new Date().toISOString() } : prev);
       const decisionLabels: Record<string, string> = {
         accepted: 'acceptée', rejected: 'rejetée', unchanged: 'inchangée', other: 'classée Autre',
       };
@@ -1064,7 +1076,7 @@ export default function ProcessRequestPage() {
                 <div key={r.id} className={`p-3 rounded-xl border ${r.id === id ? 'border-primary bg-primary/10 shadow-sm' : 'border-border bg-card'}`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-[10px] text-muted-foreground uppercase">{r.id.slice(0, 8)}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-600 ml-auto">En cours</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 ml-auto">En cours de traitement</span>
                   </div>
                   <p className="text-sm font-semibold mb-2">{r.applicant?.phone || r.phone_to_certify}</p>
                   {r.id !== id && (

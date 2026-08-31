@@ -16,6 +16,7 @@ const TYPE_COLORS: Record<string, string> = {
   new_message: 'bg-green-500',
   call_started: 'bg-primary',
   call_ended: 'bg-gray-500',
+  missed_call: 'bg-orange-500',
   recall_request: 'bg-red-500',
 };
 
@@ -54,6 +55,7 @@ export default function NotificationsPage() {
   }
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
+  const requestPath = profile?.role === 'agent' ? '/agent/process' : '/dashboard/requests';
 
   return (
     <MainLayout>
@@ -99,7 +101,7 @@ export default function NotificationsPage() {
                   <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
                 </div>
                 {n.request_id && (
-                  <Link to={`/dashboard/requests/${n.request_id}`} onClick={e => e.stopPropagation()}
+                  <Link to={`${requestPath}/${n.request_id}`} onClick={e => e.stopPropagation()}
                     className="text-xs text-primary hover:underline shrink-0 mt-1">Voir</Link>
                 )}
               </div>

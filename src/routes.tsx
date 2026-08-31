@@ -108,6 +108,7 @@ export const routes: RouteConfig[] = [
   { name: 'Traitement', path: '/agent/process/:id', element: <L><ProcessRequestPage /></L> },
   { name: 'Historique agent', path: '/agent/history', element: <L><AgentHistoryPage /></L> },
   { name: 'Messages agent', path: '/agent/messages', element: <L><AgentMessagesPage /></L> },
+  { name: 'Notifications agent', path: '/agent/notifications', element: <L><NotificationsPage /></L> },
   { name: 'Suivi mensuel', path: '/agent/monthly-tracking', element: <L><AgentMonthlyTrackingPage /></L> },
   { name: 'Performances', path: '/agent/performances', element: <L><AgentPerformancePage /></L> },
   { name: 'Paramètres agent', path: '/agent/settings', element: <L><AgentSettingsPage /></L> },

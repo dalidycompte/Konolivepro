@@ -1,6 +1,6 @@
 export type UserRole = 'applicant' | 'agent' | 'supervisor' | 'admin';
 export type RequestStatus = 'pending' | 'processing' | 'accepted' | 'rejected' | 'unchanged' | 'other';
-export type NotificationType = 'new_request' | 'request_assigned' | 'status_changed' | 'new_message' | 'call_started' | 'call_ended' | 'recall_request';
+export type NotificationType = 'new_request' | 'request_assigned' | 'status_changed' | 'new_message' | 'call_started' | 'call_ended' | 'missed_call' | 'recall_request';
 
 export interface Profile {
   id: string;

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { updateVideoCall } from '@/lib/api';
+import { createNotification, updateVideoCall } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Phone,
@@ -8,6 +8,7 @@ import {
   Wifi, WifiOff, Minimize2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { showNotification } from '@/lib/notifications';
 import {
   RTC_CONFIG, getAudioConstraints, getVideoConstraints,
   setVideoCodecPreferences, setAudioCodecPreferences,
@@ -35,12 +36,12 @@ const ICE_RESTART_DELAY_MS = 2000;
 // Intervalle de collecte des stats réseau (ms)
 const STATS_INTERVAL_MS    = 3000;
 
-async function updateSharedCallState(callId: string, action: 'REJECTED' | 'ENDED') {
+async function updateSharedCallState(callId: string, action: 'REJECTED' | 'ENDED'): Promise<boolean> {
   const { data, error } = await supabase.rpc('respond_to_mobile_video_call', {
     p_call_id: callId,
     p_action: action,
   });
-  if (error) return;
+  if (error) return false;
   const row = Array.isArray(data) ? data[0] : data;
   const receiverId = (row as { receiver_id?: string } | null)?.receiver_id;
   if (receiverId) {
@@ -48,6 +49,7 @@ async function updateSharedCallState(callId: string, action: 'REJECTED' | 'ENDED
       body: { callId, receiverId, action },
     }).catch(() => {});
   }
+  return true;
 }
 
 function getPermissionMessage(err: unknown): { title: string; detail: string } {
@@ -135,13 +137,31 @@ export default function VideoCallModal({ callId, remoteUserName, remoteUserPhoto
   useEffect(() => {
     if (!isInitiator || callState !== 'ringing') return;
     const timeout = window.setTimeout(async () => {
-      await updateSharedCallState(callId, 'ENDED');
+      const stateUpdated = await updateSharedCallState(callId, 'ENDED');
+      if (stateUpdated) {
+        await updateVideoCall(callId, {
+          status: 'missed',
+          ended_at: new Date().toISOString(),
+        });
+      }
+      if (stateUpdated && profile?.id) {
+        const title = 'Appel manqué';
+        const body = `Le Coach Mobile ${remoteUserName} n'a pas répondu à votre appel vidéo.`;
+        await createNotification({
+          user_id: profile.id,
+          type: 'missed_call',
+          title,
+          body,
+          request_id: requestId,
+        }).catch(() => {});
+        showNotification({ title, body, type: 'warning', tag: `missed_call_${callId}`, duration: 8000 });
+      }
       cleanup();
       setCallState('ended');
       setTimeout(onClose, 1200);
     }, 60_000);
     return () => window.clearTimeout(timeout);
-  }, [callId, callState, cleanup, isInitiator, onClose]);
+  }, [callId, callState, cleanup, isInitiator, onClose, profile?.id, remoteUserName, requestId]);
 
   const endCall = useCallback(async () => {
     const duration = startTimeRef.current

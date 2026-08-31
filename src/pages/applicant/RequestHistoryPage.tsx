@@ -13,7 +13,7 @@ import { fr } from 'date-fns/locale';
 const STATUSES: { value: RequestStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Toutes' },
   { value: 'pending', label: 'En attente' },
-  { value: 'processing', label: 'En cours' },
+  { value: 'processing', label: 'En cours de traitement' },
   { value: 'accepted', label: 'Acceptées' },
   { value: 'rejected', label: 'Rejetées' },
   { value: 'unchanged', label: 'Inchangées' },
