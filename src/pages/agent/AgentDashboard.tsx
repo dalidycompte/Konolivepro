@@ -355,7 +355,7 @@ export default function AgentDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: "File d'attente",      value: pending.length,        icon: <Clock size={18} />,       color: 'text-orange-500',  bg: 'bg-orange-500/10', clickable: false },
-            { label: 'En cours de traitement', value: processing.length, icon: <ClipboardList size={18}/>, color: 'text-yellow-600', bg: 'bg-yellow-500/10', clickable: false },
+            { label: 'En cours', value: processing.length, icon: <ClipboardList size={18}/>, color: 'text-yellow-600', bg: 'bg-yellow-500/10', clickable: false },
             { label: "Traités aujourd'hui",  value: todayProcessed.length, icon: <CheckCircle2 size={18}/>,  color: 'text-green-500',  bg: 'bg-green-500/10',  clickable: false },
             { label: 'Total traité',         value: totalProcessed,        icon: <History size={18}/>,       color: 'text-violet-500', bg: 'bg-violet-500/10', clickable: true  },
             { label: 'Pauses auj.',          value: pauseCount,            icon: <PauseCircle size={18}/>,   color: 'text-orange-400', bg: 'bg-orange-400/10', clickable: false },

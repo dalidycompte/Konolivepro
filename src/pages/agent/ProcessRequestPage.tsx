@@ -1076,7 +1076,7 @@ export default function ProcessRequestPage() {
                 <div key={r.id} className={`p-3 rounded-xl border ${r.id === id ? 'border-primary bg-primary/10 shadow-sm' : 'border-border bg-card'}`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-[10px] text-muted-foreground uppercase">{r.id.slice(0, 8)}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 ml-auto">En cours de traitement</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 ml-auto">En cours</span>
                   </div>
                   <p className="text-sm font-semibold mb-2">{r.applicant?.phone || r.phone_to_certify}</p>
                   {r.id !== id && (
