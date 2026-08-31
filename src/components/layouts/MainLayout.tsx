@@ -13,7 +13,7 @@ import {
   LayoutDashboard, FileText, History, MessageSquare, Bell,
   Users, Settings, BarChart2, ClipboardList, LogOut,
   Menu, Shield, UserCheck, Eye, Video, Clock, Wifi, AlertTriangle, KeyRound, CalendarDays, TrendingUp, Settings2, Smartphone, Award, Phone,
-  Table as TableIcon, Plug,
+  Table as TableIcon, Plug, ListTodo,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -55,6 +55,7 @@ function getNavItems(role: UserRole | null): NavItem[] {
       return [
         { label: 'Tableau de bord',    path: '/supervisor',                icon: <LayoutDashboard size={18} /> },
         { label: 'Stats des agents',   path: '/supervisor/agents',         icon: <UserCheck size={18} /> },
+        { label: 'Fil d’attente',       path: '/supervisor/queue',          icon: <ListTodo size={18} /> },
         { label: 'Statut des agents',  path: '/supervisor/agent-status',  icon: <Wifi size={18} /> },
         { label: 'Toutes les demandes',path: '/supervisor/requests',       icon: <ClipboardList size={18} /> },
         { label: 'GROSS ADD GSM',      path: '/supervisor/gross-add',      icon: <TableIcon size={18} /> },

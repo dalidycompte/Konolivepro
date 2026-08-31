@@ -25,6 +25,7 @@ const AgentDailyEvolutionPage = lazy(() => import('./pages/agent/AgentDailyEvolu
 
 const SupervisorDashboard = lazy(() => import('./pages/supervisor/SupervisorDashboard'));
 const SupervisorAgentStatsPage = lazy(() => import('./pages/supervisor/SupervisorAgentStatsPage'));
+const SupervisorQueuePage = lazy(() => import('./pages/supervisor/SupervisorQueuePage'));
 const SupervisorHistoryPage = lazy(() => import('./pages/supervisor/SupervisorHistoryPage'));
 const SupervisorRequestsPage = lazy(() => import('./pages/supervisor/SupervisorRequestsPage'));
 const SupervisorReportsPage = lazy(() => import('./pages/supervisor/SupervisorReportsPage'));
@@ -116,6 +117,7 @@ export const routes: RouteConfig[] = [
   // Supervisor
   { name: 'Superviseur', path: '/supervisor', element: <L><SupervisorDashboard /></L> },
   { name: 'Stats agents', path: '/supervisor/agents', element: <L><SupervisorAgentStatsPage /></L> },
+  { name: 'Fil d’attente', path: '/supervisor/queue', element: <L><SupervisorQueuePage /></L> },
   { name: 'Historique', path: '/supervisor/history', element: <L><SupervisorHistoryPage /></L> },
   { name: 'Demandes', path: '/supervisor/requests', element: <L><SupervisorRequestsPage /></L> },
   { name: 'Rapports', path: '/supervisor/reports', element: <L><SupervisorReportsPage /></L> },
